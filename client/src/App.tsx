@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
 import { FileUpload } from './components/FileUpload';
 import { AnalysisResult } from './components/AnalysisResult';
 import { VerificationChat } from './pages/VerificationChat';
+import { Dashboard } from './pages/Dashboard';
+import TestChat from './pages/TestChat';
 
 // Types
 interface AnalysisResponse {
@@ -45,6 +47,22 @@ function Home() {
         <div className="text-center mb-12">
           <h1 className="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600 tracking-tight">Trust Check AI</h1>
           <p className="mt-4 text-lg text-slate-600">Autonomous Background Verification Agent powered by Gemini 3</p>
+
+          {/* Navigation Links */}
+          <div className="flex gap-3 justify-center mt-6">
+            <Link
+              to="/dashboard"
+              className="inline-block px-5 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-700 transition-colors font-medium"
+            >
+              📊 Dashboard
+            </Link>
+            <Link
+              to="/test-chat"
+              className="inline-block px-5 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium"
+            >
+              🧪 Test API
+            </Link>
+          </div>
         </div>
 
         <div className="bg-white/50 backdrop-blur-sm shadow-xl rounded-2xl p-6 md:p-10 border border-white">
@@ -70,7 +88,9 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Home />} />
+        <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/verify/:id" element={<VerificationChat />} />
+        <Route path="/test-chat" element={<TestChat />} />
       </Routes>
     </BrowserRouter>
   );

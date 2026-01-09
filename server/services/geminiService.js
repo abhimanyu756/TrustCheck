@@ -15,7 +15,7 @@ const fileToGenerativePart = (buffer, mimeType) => {
 async function analyzeDocument(fileBuffer, mimeType, prompt) {
     try {
         // access your API key as an environment variable (see "Set up your API key" above)
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" }); // Using 1.5 Flash for speed/vision, upgrade to 1.5 Pro or 3 as needed
+        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" }); // Using 1.5 Flash for speed/vision, upgrade to 1.5 Pro or 3 as needed
 
         const imagePart = fileToGenerativePart(fileBuffer, mimeType);
 

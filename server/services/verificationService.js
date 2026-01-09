@@ -1,34 +1,68 @@
 const { GoogleGenerativeAI } = require("@google/generative-ai");
+const { compareData } = require('./comparisonService');
+const { analyzeSentiment } = require('./forensicsService');
+const {
+    saveVerificationRequest,
+    getVerificationRequest,
+    getAllVerificationRequests,
+    saveChatMessage,
+    updateHRResponses,
+    updateVerificationStatus,
+    saveAnalysisResults
+} = require('./database');
 require('dotenv').config();
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-// In-memory store for demo (Use DB in prod)
-const requests = {};
-
 async function createVerificationRequest(data) {
     const id = Math.random().toString(36).substring(7);
-    requests[id] = {
-        id,
-        candidateData: data,
-        chatHistory: [],
-        status: 'PENDING',
-        createdAt: new Date(),
-        hrResponses: {} // To store final verified facts
-    };
+    await saveVerificationRequest(id, data);
     return id;
 }
 
 async function getRequest(id) {
-    return requests[id];
+    return await getVerificationRequest(id);
+}
+
+async function getAllRequests() {
+    return await getAllVerificationRequests();
 }
 
 async function chatWithHR(requestId, userMessage) {
-    const request = requests[requestId];
+    const request = await getVerificationRequest(requestId);
     if (!request) throw new Error('Request not found');
 
-    // Add user message to history
-    request.chatHistory.push({ role: 'user', content: userMessage });
+    // Save user message to database
+    await saveChatMessage(requestId, 'user', userMessage);
+
+    // Extract structured data from HR responses using Gemini
+    const extractionPrompt = `
+Extract employment verification data from this HR response: "${userMessage}"
+
+Return JSON with any mentioned fields:
+{
+  "employeeName": "...",
+  "designation": "...",
+  "salary": "...",
+  "dates": "...",
+  "department": "..."
+}
+
+If field not mentioned, omit it. Return only JSON.
+`;
+
+    try {
+        const extractModel = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+        const extractResult = await extractModel.generateContent(extractionPrompt);
+        const extractedJson = extractResult.response.text().replace(/```json/g, '').replace(/```/g, '').trim();
+        const extractedData = JSON.parse(extractedJson);
+
+        // Merge and save extracted data
+        const updatedHRResponses = { ...request.hrResponses, ...extractedData };
+        await updateHRResponses(requestId, updatedHRResponses);
+    } catch (e) {
+        console.log('Could not extract structured data:', e.message);
+    }
 
     // Construct context for Gemini
     const context = `
@@ -36,26 +70,65 @@ async function chatWithHR(requestId, userMessage) {
     
     Candidate Claims:
     - Name: ${request.candidateData.employeeName}
-    - Role: ${request.candidateData.lastDesignation || 'Unknown'}
+    - Company: ${request.candidateData.companyName || 'Unknown'}
+    - Role: ${request.candidateData.designation || 'Unknown'}
     - Dates: ${request.candidateData.dates || 'Unknown'}
     - Salary: ${request.candidateData.salary || 'Unknown'}
     
     Goal: Verify these details politely but firmly. Ask one question at a time.
-    If the HR confirms everything, say "Thank you, verification complete." and output [VERIFIED].
-    If there is a discrepancy, ask for clarification.
+    If the HR confirms everything, say "Thank you, verification complete." and output [COMPLETE].
+    If there is a discrepancy, note it and continue asking.
     
     Current Chat History:
     ${request.chatHistory.map(m => `${m.role}: ${m.content}`).join('\n')}
+    user: ${userMessage}
   `;
 
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
     const result = await model.generateContent(context);
     const response = result.response.text();
 
-    // Add AI response to history
-    request.chatHistory.push({ role: 'model', content: response });
+    // Save AI response to database
+    await saveChatMessage(requestId, 'model', response);
+
+    // Check if verification is complete
+    if (response.includes('[COMPLETE]')) {
+        await updateVerificationStatus(requestId, 'COMPLETED');
+
+        // Get updated request data
+        const updatedRequest = await getVerificationRequest(requestId);
+
+        // Run comparison analysis
+        let comparisonResult = null;
+        try {
+            if (Object.keys(updatedRequest.hrResponses).length > 0) {
+                comparisonResult = await compareData(updatedRequest.candidateData, updatedRequest.hrResponses);
+            }
+        } catch (e) {
+            console.error('Comparison failed:', e);
+        }
+
+        // Run sentiment analysis on HR messages
+        let sentimentAnalysis = null;
+        try {
+            const hrMessages = updatedRequest.chatHistory
+                .filter(m => m.role === 'user')
+                .map(m => m.content);
+
+            if (hrMessages.length > 0) {
+                sentimentAnalysis = await analyzeSentiment(hrMessages);
+            }
+        } catch (e) {
+            console.error('Sentiment analysis failed:', e);
+        }
+
+        // Save analysis results
+        if (comparisonResult || sentimentAnalysis) {
+            await saveAnalysisResults(requestId, comparisonResult, sentimentAnalysis);
+        }
+    }
 
     return response;
 }
 
-module.exports = { createVerificationRequest, getRequest, chatWithHR };
+module.exports = { createVerificationRequest, getRequest, getAllRequests, chatWithHR };

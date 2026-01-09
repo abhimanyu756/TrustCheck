@@ -1,16 +1,32 @@
-import React from 'react';
+import React, { useState } from 'react';
 
 interface ExtractedData {
     employeeName: string;
     companyName: string;
     dates: string;
     salary: string;
-    [key: string]: string;
+    designation?: string;
+    [key: string]: string | undefined;
 }
 
 interface AuthenticityCheck {
     isSuspicious: boolean;
     reason: string;
+    visualAnomalies?: string[];
+}
+
+interface MetadataForensics {
+    metadata: any;
+    analysis: {
+        isSuspicious: boolean;
+        suspicionLevel: string;
+        findings: Array<{
+            issue: string;
+            severity: string;
+            explanation: string;
+        }>;
+        recommendation: string;
+    };
 }
 
 interface AnalysisResultProps {
@@ -18,14 +34,18 @@ interface AnalysisResultProps {
         documentType: string;
         extractedData: ExtractedData;
         authenticityCheck: AuthenticityCheck;
+        metadataForensics?: MetadataForensics;
     } | null;
     onReset: () => void;
 }
 
 export const AnalysisResult: React.FC<AnalysisResultProps> = ({ data, onReset }) => {
+    const [showMetadata, setShowMetadata] = useState(false);
+
     if (!data) return null;
 
     const isHighRisk = data.authenticityCheck.isSuspicious;
+    const hasMetadataIssues = data.metadataForensics?.analysis?.isSuspicious;
 
     return (
         <div className="w-full max-w-2xl mx-auto mt-8 animate-fade-in">
@@ -45,6 +65,65 @@ export const AnalysisResult: React.FC<AnalysisResultProps> = ({ data, onReset })
                 {isHighRisk && (
                     <div className="mt-3 p-3 bg-white/80 rounded-lg text-sm text-red-600 border border-red-200">
                         <strong>Analysis:</strong> {data.authenticityCheck.reason}
+                    </div>
+                )}
+
+                {/* Visual Anomalies */}
+                {data.authenticityCheck.visualAnomalies && data.authenticityCheck.visualAnomalies.length > 0 && (
+                    <div className="mt-3 p-3 bg-orange-50 rounded-lg text-sm border border-orange-200">
+                        <strong className="text-orange-800">Visual Anomalies Detected:</strong>
+                        <ul className="mt-1 ml-4 list-disc text-orange-700">
+                            {data.authenticityCheck.visualAnomalies.map((anomaly, idx) => (
+                                <li key={idx}>{anomaly}</li>
+                            ))}
+                        </ul>
+                    </div>
+                )}
+
+                {/* Metadata Forensics Section */}
+                {data.metadataForensics && (
+                    <div className="mt-4">
+                        <button
+                            onClick={() => setShowMetadata(!showMetadata)}
+                            className="w-full flex justify-between items-center p-3 bg-white/60 rounded-lg border border-current/20 hover:bg-white/80 transition-colors"
+                        >
+                            <span className="font-bold text-sm">🔍 PDF Metadata Forensics</span>
+                            <span className={`px-2 py-1 rounded text-xs font-bold ${hasMetadataIssues ? 'bg-red-200 text-red-800' : 'bg-green-200 text-green-800'}`}>
+                                {data.metadataForensics.analysis.suspicionLevel}
+                            </span>
+                        </button>
+
+                        {showMetadata && (
+                            <div className="mt-2 p-4 bg-white/80 rounded-lg border border-current/20 space-y-2">
+                                <div className="text-xs">
+                                    <strong>Creator:</strong> {data.metadataForensics.metadata.info?.Creator || 'Unknown'}
+                                </div>
+                                <div className="text-xs">
+                                    <strong>Producer:</strong> {data.metadataForensics.metadata.info?.Producer || 'Unknown'}
+                                </div>
+
+                                {data.metadataForensics.analysis.findings.length > 0 && (
+                                    <div className="mt-3">
+                                        <div className="text-xs font-bold text-red-700 mb-1">Forensic Findings:</div>
+                                        {data.metadataForensics.analysis.findings.map((finding, idx) => (
+                                            <div key={idx} className="text-xs bg-red-50 p-2 rounded border border-red-200 mb-1">
+                                                <div className="flex justify-between">
+                                                    <strong>{finding.issue}</strong>
+                                                    <span className={`px-2 py-0.5 rounded text-xs font-bold ${finding.severity === 'HIGH' ? 'bg-red-200 text-red-800' : 'bg-yellow-200 text-yellow-800'}`}>
+                                                        {finding.severity}
+                                                    </span>
+                                                </div>
+                                                <div className="mt-1 opacity-75">{finding.explanation}</div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+
+                                <div className="mt-2 text-xs italic opacity-75">
+                                    {data.metadataForensics.analysis.recommendation}
+                                </div>
+                            </div>
+                        )}
                     </div>
                 )}
             </div>
