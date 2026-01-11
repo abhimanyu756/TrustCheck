@@ -27,7 +27,7 @@ PINECONE_INDEX=trustcheck-vectors
 
 ### 4. Index Creation
 The application automatically creates the index on first run with:
-- **Dimension**: 768 (Gemini embedding size)
+- **Dimension**: 1024 (Gemini embedding size)
 - **Metric**: Cosine similarity
 - **Cloud**: AWS (Serverless)
 - **Region**: us-east-1

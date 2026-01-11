@@ -24,7 +24,7 @@ const initPinecone = async () => {
             console.log(`Creating Pinecone index: ${indexName}...`);
             await pinecone.createIndex({
                 name: indexName,
-                dimension: 1024, // Match existing Pinecone index dimension
+                dimension: 768, // Match existing Pinecone index dimension
                 metric: 'cosine',
                 spec: {
                     serverless: {
@@ -44,14 +44,14 @@ const initPinecone = async () => {
 
 /**
  * Generate embeddings using Gemini
- * Using text-embedding-004 with 1024 dimensions to match Pinecone index
+ * Using text-embedding-004 with 768 dimensions to match Pinecone index
  */
 const generateEmbedding = async (text) => {
     try {
         const model = genAI.getGenerativeModel({ model: "text-embedding-004" });
         const result = await model.embedContent(text, {
             taskType: "RETRIEVAL_DOCUMENT",
-            outputDimensionality: 1024
+            outputDimensionality: 768
         });
         return result.embedding.values;
     } catch (error) {

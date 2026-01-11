@@ -47,10 +47,16 @@ const initDB = async () => {
 /**
  * Generate embeddings using Gemini
  */
+// server/services/database.js
+// Find the generateEmbedding function (around line 60) and update it:
+
 const generateEmbedding = async (text) => {
   try {
     const model = genAI.getGenerativeModel({ model: "text-embedding-004" });
-    const result = await model.embedContent(text);
+    const result = await model.embedContent(text, {
+      taskType: "RETRIEVAL_DOCUMENT",
+      outputDimensionality: 768  // ADD THIS LINE
+    });
     return result.embedding.values;
   } catch (error) {
     console.error('Embedding generation error:', error);
@@ -352,6 +358,35 @@ const saveAnalysisResults = async (requestId, comparisonResult, sentimentAnalysi
   }
 };
 
+/**
+ * Update verification metadata (for email-based verifications)
+ */
+const updateVerificationMetadata = async (requestId, metadata) => {
+  try {
+    // Fetch existing verification request
+    const verificationResult = await index.fetch([`verification_${requestId}`]);
+    const verificationVector = verificationResult.records[`verification_${requestId}`];
+
+    if (!verificationVector) return;
+
+    const existingMetadata = verificationVector.metadata;
+    const updatedMetadata = {
+      ...existingMetadata,
+      ...metadata,
+      updated_at: new Date().toISOString()
+    };
+
+    // Update the vector with new metadata
+    await index.upsert([{
+      id: `verification_${requestId}`,
+      values: verificationVector.values,
+      metadata: updatedMetadata
+    }]);
+  } catch (error) {
+    console.error('Error updating verification metadata:', error);
+  }
+};
+
 const saveDocumentAnalysis = async (documentType, extractedData, authenticityCheck, metadataForensics) => {
   try {
     const id = `doc_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -403,6 +438,7 @@ module.exports = {
   saveChatMessage,
   updateHRResponses,
   updateVerificationStatus,
+  updateVerificationMetadata,
   saveAnalysisResults,
   saveDocumentAnalysis
 };
