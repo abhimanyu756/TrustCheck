@@ -1,0 +1,259 @@
+.verification-status {
+    background: white;
+    border-radius: 12px;
+    padding: 24px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.verification-status.loading,
+.verification-status.error {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px;
+}
+
+.spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid #e5e7eb;
+    border-top-color: #3b82f6;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Header */
+.status-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.status-header h3 {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 600;
+    color: #1f2937;
+}
+
+/* Status Badges */
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 16px;
+    font-size: 14px;
+    font-weight: 600;
+    color: white;
+}
+
+.status-badge.green {
+    background: #10b981;
+}
+
+.status-badge.yellow {
+    background: #f59e0b;
+}
+
+.status-badge.red {
+    background: #ef4444;
+}
+
+.status-badge.processing {
+    background: #3b82f6;
+}
+
+.status-badge.pending {
+    background: #6b7280;
+}
+
+/* Progress Steps */
+.progress-steps {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 24px;
+    position: relative;
+}
+
+.progress-step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    position: relative;
+}
+
+.step-indicator {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: #e5e7eb;
+    color: #6b7280;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 16px;
+    z-index: 2;
+    transition: all 0.3s ease;
+}
+
+.progress-step.completed .step-indicator {
+    background: #10b981;
+    color: white;
+}
+
+.step-label {
+    font-size: 12px;
+    color: #6b7280;
+    text-align: center;
+}
+
+.progress-step.completed .step-label {
+    color: #1f2937;
+    font-weight: 500;
+}
+
+.step-connector {
+    position: absolute;
+    top: 20px;
+    left: 50%;
+    width: 100%;
+    height: 2px;
+    background: #e5e7eb;
+    z-index: 1;
+}
+
+.progress-step.completed .step-connector {
+    background: #10b981;
+}
+
+/* Status Details */
+.status-details {
+    background: #f9fafb;
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 16px;
+}
+
+.detail-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.detail-row:last-child {
+    border-bottom: none;
+}
+
+.detail-label {
+    font-size: 14px;
+    color: #6b7280;
+    font-weight: 500;
+}
+
+.detail-value {
+    font-size: 14px;
+    color: #1f2937;
+    font-weight: 600;
+}
+
+.detail-value.risk-score {
+    color: #ef4444;
+}
+
+/* Actions */
+.status-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 16px;
+}
+
+.btn-fetch {
+    padding: 12px 24px;
+    background: #3b82f6;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.btn-fetch:hover:not(:disabled) {
+    background: #2563eb;
+}
+
+.btn-fetch:disabled {
+    background: #9ca3af;
+    cursor: not-allowed;
+}
+
+.action-hint {
+    font-size: 12px;
+    color: #6b7280;
+    text-align: center;
+    margin: 0;
+}
+
+/* Status Info */
+.status-info {
+    background: #eff6ff;
+    border-left: 4px solid #3b82f6;
+    padding: 12px 16px;
+    border-radius: 8px;
+    margin-top: 16px;
+}
+
+.status-info p {
+    margin: 0;
+    font-size: 14px;
+    color: #1f2937;
+}
+
+.info-hint {
+    font-size: 12px;
+    color: #6b7280;
+    margin-top: 4px !important;
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+    .status-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .progress-steps {
+        flex-direction: column;
+        gap: 16px;
+    }
+
+    .step-connector {
+        display: none;
+    }
+
+    .progress-step {
+        flex-direction: row;
+        justify-content: flex-start;
+    }
+
+    .step-label {
+        text-align: left;
+    }
+}

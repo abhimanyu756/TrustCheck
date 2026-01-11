@@ -76,21 +76,33 @@ export const Dashboard: React.FC = () => {
                 </div>
 
                 {/* Stats Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+                <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8">
                     <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
                         <div className="text-sm text-slate-500 uppercase tracking-wide">Total Requests</div>
                         <div className="text-3xl font-bold text-slate-800 mt-2">{requests.length}</div>
                     </div>
-                    <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                        <div className="text-sm text-slate-500 uppercase tracking-wide">Completed</div>
+                    <div className="bg-white p-6 rounded-xl shadow-sm border border-green-200 bg-green-50">
+                        <div className="text-sm text-green-700 uppercase tracking-wide flex items-center gap-2">
+                            <span>✅</span> Green Zone
+                        </div>
                         <div className="text-3xl font-bold text-green-600 mt-2">
-                            {requests.filter(r => r.status === 'COMPLETED').length}
+                            {requests.filter(r => r.status?.includes('GREEN')).length}
                         </div>
                     </div>
-                    <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                        <div className="text-sm text-slate-500 uppercase tracking-wide">High Risk</div>
+                    <div className="bg-white p-6 rounded-xl shadow-sm border border-yellow-200 bg-yellow-50">
+                        <div className="text-sm text-yellow-700 uppercase tracking-wide flex items-center gap-2">
+                            <span>⚠️</span> Yellow Zone
+                        </div>
+                        <div className="text-3xl font-bold text-yellow-600 mt-2">
+                            {requests.filter(r => r.status?.includes('YELLOW')).length}
+                        </div>
+                    </div>
+                    <div className="bg-white p-6 rounded-xl shadow-sm border border-red-200 bg-red-50">
+                        <div className="text-sm text-red-700 uppercase tracking-wide flex items-center gap-2">
+                            <span>🚨</span> Red Zone
+                        </div>
                         <div className="text-3xl font-bold text-red-600 mt-2">
-                            {requests.filter(r => r.riskLevel === 'HIGH').length}
+                            {requests.filter(r => r.status?.includes('RED')).length}
                         </div>
                     </div>
                     <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">

@@ -2,35 +2,53 @@ const { google } = require('googleapis');
 require('dotenv').config();
 
 let sheets = null;
-let auth = null;
+let drive = null;
+let oauth2Client = null;
 
 /**
- * Initialize Google Sheets API with service account
+ * Initialize Google Sheets API with OAuth
  */
 const initGoogleSheets = async () => {
     try {
-        // Check if credentials are configured
-        if (!process.env.GOOGLE_SHEETS_CLIENT_EMAIL || !process.env.GOOGLE_SHEETS_PRIVATE_KEY) {
-            console.warn('⚠️  Google Sheets credentials not configured. Using mock mode.');
+        // Check if OAuth credentials are configured
+        if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET || !process.env.GOOGLE_REFRESH_TOKEN) {
+            console.warn('⚠️  Google OAuth credentials not configured. Using mock mode.');
             return null;
         }
 
-        auth = new google.auth.GoogleAuth({
-            credentials: {
-                client_email: process.env.GOOGLE_SHEETS_CLIENT_EMAIL,
-                private_key: process.env.GOOGLE_SHEETS_PRIVATE_KEY.replace(/\\n/g, '\n'),
-            },
-            scopes: [
-                'https://www.googleapis.com/auth/spreadsheets',
-                'https://www.googleapis.com/auth/drive.file'
-            ],
+        // Create OAuth2 client
+        oauth2Client = new google.auth.OAuth2(
+            process.env.GOOGLE_CLIENT_ID,
+            process.env.GOOGLE_CLIENT_SECRET,
+            'https://developers.google.com/oauthplayground' // Redirect URI
+        );
+
+        // Set refresh token
+        oauth2Client.setCredentials({
+            refresh_token: process.env.GOOGLE_REFRESH_TOKEN
         });
 
-        sheets = google.sheets({ version: 'v4', auth });
-        console.log('✅ Google Sheets API initialized');
+        // Initialize APIs
+        sheets = google.sheets({ version: 'v4', auth: oauth2Client });
+        drive = google.drive({ version: 'v3', auth: oauth2Client });
+
+        // Test the connection
+        await sheets.spreadsheets.create({
+            requestBody: {
+                properties: { title: 'TrustCheck Test' }
+            }
+        }).then(async (response) => {
+            // Delete the test spreadsheet
+            await drive.files.delete({ fileId: response.data.spreadsheetId });
+            console.log('✅ Google Sheets API initialized (OAuth)');
+        });
+
         return sheets;
     } catch (error) {
         console.error('❌ Google Sheets initialization error:', error.message);
+        if (error.message.includes('invalid_grant')) {
+            console.error('   → Your refresh token has expired. Generate a new one from OAuth Playground.');
+        }
         return null;
     }
 };
@@ -68,6 +86,7 @@ const createVerificationSheet = async (candidateData, requestId) => {
         });
 
         const spreadsheetId = createResponse.data.spreadsheetId;
+        const sheetId = createResponse.data.sheets[0].properties.sheetId; // Get actual sheet ID
 
         // Prepare data for the sheet
         const values = [
@@ -95,7 +114,7 @@ const createVerificationSheet = async (candidateData, requestId) => {
             requestBody: { values },
         });
 
-        // Format the sheet
+        // Format the sheet using the correct sheetId
         await sheets.spreadsheets.batchUpdate({
             spreadsheetId,
             requestBody: {
@@ -104,7 +123,7 @@ const createVerificationSheet = async (candidateData, requestId) => {
                     {
                         repeatCell: {
                             range: {
-                                sheetId: 0,
+                                sheetId: sheetId, // Use actual sheet ID
                                 startRowIndex: 0,
                                 endRowIndex: 1,
                             },
@@ -122,7 +141,7 @@ const createVerificationSheet = async (candidateData, requestId) => {
                         addProtectedRange: {
                             protectedRange: {
                                 range: {
-                                    sheetId: 0,
+                                    sheetId: sheetId, // Use actual sheet ID
                                     startColumnIndex: 1,
                                     endColumnIndex: 2,
                                 },
@@ -135,7 +154,7 @@ const createVerificationSheet = async (candidateData, requestId) => {
                     {
                         autoResizeDimensions: {
                             dimensions: {
-                                sheetId: 0,
+                                sheetId: sheetId, // Use actual sheet ID
                                 dimension: 'COLUMNS',
                                 startIndex: 0,
                                 endIndex: 4,
@@ -147,7 +166,6 @@ const createVerificationSheet = async (candidateData, requestId) => {
         });
 
         // Make sheet publicly editable (anyone with link can edit)
-        const drive = google.drive({ version: 'v3', auth });
         await drive.permissions.create({
             fileId: spreadsheetId,
             requestBody: {
@@ -167,7 +185,10 @@ const createVerificationSheet = async (candidateData, requestId) => {
         };
 
     } catch (error) {
-        console.error('Error creating verification sheet:', error);
+        console.error('Error creating verification sheet:', error.message);
+        if (error.message.includes('invalid_grant')) {
+            console.error('   → Your refresh token has expired. Generate a new one from OAuth Playground.');
+        }
         throw error;
     }
 };
@@ -233,7 +254,7 @@ const getSheetResponses = async (spreadsheetId) => {
         return hrResponses;
 
     } catch (error) {
-        console.error('Error reading sheet responses:', error);
+        console.error('Error reading sheet responses:', error.message);
         throw error;
     }
 };

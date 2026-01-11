@@ -1,7 +1,8 @@
 const cron = require('node-cron');
-const { getAllVerificationRequests, updateVerificationMetadata } = require('./database');
-const { hasHRResponded } = require('./googleSheetsService');
+const { getAllVerificationRequests, updateVerificationMetadata, updateVerificationStatus, saveAnalysisResults } = require('./database');
+const { hasHRResponded, getSheetResponses } = require('./googleSheetsService');
 const { sendReminderEmail, sendEscalationEmail } = require('./emailService');
+const { compareData } = require('./comparisonService');
 
 let reminderJob = null;
 
@@ -36,7 +37,27 @@ const checkAndSendReminders = async () => {
                 const hasResponded = await hasHRResponded(request.googleSheetsId);
 
                 if (hasResponded) {
-                    console.log(`✅ HR has responded for ${request.id}, skipping reminder`);
+                    console.log(`✅ HR has responded for ${request.id}, fetching and comparing data...`);
+
+                    // Fetch HR responses
+                    const hrData = await getSheetResponses(request.googleSheetsId);
+
+                    if (hrData) {
+                        // Run comparison
+                        const comparisonResult = await compareData(request.candidateData, hrData);
+
+                        // Save results
+                        await saveAnalysisResults(request.id, comparisonResult, null);
+
+                        // Update status based on zone
+                        const newStatus = comparisonResult.zone === 'GREEN' ? 'VERIFIED_GREEN' :
+                            comparisonResult.zone === 'YELLOW' ? 'VERIFIED_YELLOW' : 'VERIFIED_RED';
+
+                        await updateVerificationStatus(request.id, newStatus);
+
+                        console.log(`✅ Verification ${request.id} completed: ${newStatus} (Risk: ${comparisonResult.riskScore})`);
+                    }
+
                     continue;
                 }
 

@@ -5,6 +5,7 @@ import { AnalysisResult } from './components/AnalysisResult';
 import { VerificationChat } from './pages/VerificationChat';
 import { Dashboard } from './pages/Dashboard';
 import TestChat from './pages/TestChat';
+import VerificationDetails from './pages/VerificationDetails';
 
 // Types
 interface AnalysisResponse {
@@ -90,6 +91,7 @@ function App() {
         <Route path="/" element={<Home />} />
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/verify/:id" element={<VerificationChat />} />
+        <Route path="/verify/:id/details" element={<VerificationDetails />} />
         <Route path="/test-chat" element={<TestChat />} />
       </Routes>
     </BrowserRouter>
