@@ -4,7 +4,7 @@ const { createVerificationRequest, getRequest, chatWithHR } = require('../servic
 const { sendVerificationEmail } = require('../services/emailService');
 const { createVerificationSheet, getSheetResponses, hasHRResponded } = require('../services/googleSheetsService');
 const { compareData } = require('../services/comparisonService');
-const { getVerificationRequest, saveAnalysisResults, updateVerificationStatus } = require('../services/database');
+const { getVerificationRequest, saveAnalysisResults, updateVerificationStatus, updateVerificationMetadata } = require('../services/database');
 
 router.post('/initiate', async (req, res) => {
     try {
@@ -19,6 +19,15 @@ router.post('/initiate', async (req, res) => {
         console.log('📊 Creating Google Sheet...');
         const sheetData = await createVerificationSheet(candidateData, requestId);
         console.log('✅ Sheet created:', sheetData.spreadsheetUrl);
+
+        // Save Google Sheets info to database
+        await updateVerificationMetadata(requestId, {
+            googleSheetsId: sheetData.spreadsheetId,
+            googleSheetsUrl: sheetData.spreadsheetUrl,
+            hrEmail: hrEmail,
+            verificationType: 'EMAIL'
+        });
+        console.log('✅ Saved Google Sheets metadata');
 
         // Send email with Google Sheets link
         console.log('📧 Sending email to:', hrEmail);

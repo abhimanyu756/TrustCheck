@@ -152,7 +152,7 @@ async function compareData(candidateData, hrVerifiedData, clientRules = DEFAULT_
     const ruleBasedResult = await compareWithRules(candidateData, hrVerifiedData, clientRules);
 
     // Then, get Gemini AI analysis for detailed insights
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
 
     const prompt = `
 You are a forensic analyst comparing employment verification data.

@@ -15,6 +15,12 @@ const verificationRoutes = require('./routes/verificationRoutes');
 const emailVerificationRoutes = require('./routes/emailVerificationRoutes');
 const testChatRoutes = require('./routes/testChatRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
+const clientRoutes = require('./routes/clientRoutes');
+const caseRoutes = require('./routes/caseRoutes');
+const checkRoutes = require('./routes/checkRoutes');
+const documentUploadRoutes = require('./routes/documentUploadRoutes');
+const activityLogRoutes = require('./routes/activityLogRoutes');
+const emailRoutes = require('./routes/emailRoutes');
 
 app.use(cors());
 app.use(express.json());
@@ -28,6 +34,12 @@ app.use('/api/verify', verificationRoutes);
 app.use('/api/email-verification', emailVerificationRoutes);
 app.use('/api/chat', testChatRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/clients', clientRoutes);
+app.use('/api/cases', caseRoutes);
+app.use('/api/checks', checkRoutes);
+app.use('/api/document-upload', documentUploadRoutes);
+app.use('/api/activity-logs', activityLogRoutes);
+app.use('/api/emails', emailRoutes);
 
 // Initialize all services, then start server
 Promise.all([

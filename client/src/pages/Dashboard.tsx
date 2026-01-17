@@ -183,7 +183,7 @@ export const Dashboard: React.FC = () => {
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap">
                                                 <Link
-                                                    to={`/verify/${req.id}`}
+                                                    to={`/verify/${req.id}/details`}
                                                     className="text-blue-600 hover:text-blue-800 font-medium text-sm"
                                                 >
                                                     View Details →

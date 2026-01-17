@@ -205,7 +205,7 @@ const templates = {
 /**
  * Send initial verification email with Google Sheets link
  */
-async function sendVerificationEmail(hrEmail, candidateName, sheetUrl, requestId) {
+async function sendVerificationEmail(hrEmail, candidateName, sheetUrl, requestId, checkId = null) {
     try {
         // Mock mode
         if (!transporter) {
@@ -216,6 +216,22 @@ async function sendVerificationEmail(hrEmail, candidateName, sheetUrl, requestId
             console.log(`Sheet URL: ${sheetUrl}`);
             console.log(`Request ID: ${requestId}`);
             console.log('=================================================');
+
+            // Log activity even in mock mode
+            if (checkId) {
+                const { logActivity } = require('./database');
+                const template = handlebars.compile(templates.initialVerification);
+                const htmlBody = template({ candidateName, sheetUrl, requestId });
+
+                await logActivity('check', checkId, 'EMAIL_SENT', `Verification email sent to ${hrEmail}`, {
+                    hrEmail,
+                    subject: `Background Verification Request - ${candidateName}`,
+                    emailBody: htmlBody.replace(/<[^>]*>/g, ''), // Strip HTML for plain text
+                    googleSheetsUrl: sheetUrl,
+                    status: 'SENT'
+                });
+            }
+
             return { success: true, messageId: `mock_${Date.now()}`, isMock: true };
         }
 
@@ -231,6 +247,19 @@ async function sendVerificationEmail(hrEmail, candidateName, sheetUrl, requestId
 
         const info = await transporter.sendMail(mailOptions);
         console.log(`✅ Verification email sent to ${hrEmail}: ${info.messageId}`);
+
+        // Log activity
+        if (checkId) {
+            const { logActivity } = require('./database');
+            await logActivity('check', checkId, 'EMAIL_SENT', `Verification email sent to ${hrEmail}`, {
+                hrEmail,
+                subject: mailOptions.subject,
+                emailBody: html.replace(/<[^>]*>/g, ''), // Strip HTML for plain text
+                googleSheetsUrl: sheetUrl,
+                status: 'SENT',
+                messageId: info.messageId
+            });
+        }
 
         return { success: true, messageId: info.messageId, isMock: false };
     } catch (error) {

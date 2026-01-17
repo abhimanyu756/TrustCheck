@@ -52,7 +52,7 @@ If field not mentioned, omit it. Return only JSON.
 `;
 
     try {
-        const extractModel = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+        const extractModel = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
         const extractResult = await extractModel.generateContent(extractionPrompt);
         const extractedJson = extractResult.response.text().replace(/```json/g, '').replace(/```/g, '').trim();
         const extractedData = JSON.parse(extractedJson);
@@ -84,7 +84,7 @@ If field not mentioned, omit it. Return only JSON.
     user: ${userMessage}
   `;
 
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
     const result = await model.generateContent(context);
     const response = result.response.text();
 

@@ -16,7 +16,7 @@ router.post('/test', async (req, res) => {
         console.log('📨 Received message:', message);
 
         // Test Gemini API
-        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
 
         const result = await model.generateContent(message);
         const response = result.response.text();
@@ -26,7 +26,7 @@ router.post('/test', async (req, res) => {
         res.json({
             success: true,
             response,
-            model: 'gemini-2.5-flash'
+            model: 'gemini-2.5-flash-lite'
         });
 
     } catch (error) {
