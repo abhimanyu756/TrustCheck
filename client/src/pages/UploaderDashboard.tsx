@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
+import Logo from '../components/Logo';
+import Breadcrumb from '../components/Breadcrumb';
 
 // Document type configurations per check type
 const DOCUMENT_TYPES = {
@@ -205,17 +207,14 @@ const UploaderDashboard = () => {
             <div className="max-w-7xl mx-auto">
                 {/* Header */}
                 <div className="mb-8">
-                    <div className="flex justify-between items-center">
-                        <div>
-                            <h1 className="text-3xl font-bold text-slate-800">Document Uploader</h1>
-                            <p className="text-slate-600 mt-2">Upload verification documents for each check</p>
-                        </div>
-                        <Link
-                            to="/"
-                            className="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors font-medium"
-                        >
-                            ← Back to Home
-                        </Link>
+                    <Logo />
+                    <div className="mt-6">
+                        <Breadcrumb items={[
+                            { label: 'Home', path: '/' },
+                            { label: 'Document Uploader' }
+                        ]} />
+                        <h1 className="text-3xl font-bold text-slate-800">Document Uploader</h1>
+                        <p className="text-slate-600 mt-2">Upload verification documents for each check</p>
                     </div>
                 </div>
 

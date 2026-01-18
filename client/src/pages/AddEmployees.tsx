@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import Logo from '../components/Logo';
+import Breadcrumb from '../components/Breadcrumb';
 
 interface PreviousEmployment {
     companyName: string;
@@ -125,8 +127,16 @@ const AddEmployees = () => {
             <div className="max-w-5xl mx-auto">
                 {/* Header */}
                 <div className="mb-8">
-                    <h1 className="text-3xl font-bold text-slate-800">Add Employees</h1>
-                    <p className="text-slate-600 mt-2">Add employee details and their previous employment history</p>
+                    <Logo />
+                    <div className="mt-6">
+                        <Breadcrumb items={[
+                            { label: 'Home', path: '/' },
+                            { label: 'Client Management', path: '/clients' },
+                            { label: 'Add Employees' }
+                        ]} />
+                        <h1 className="text-3xl font-bold text-slate-800">Add Employees</h1>
+                        <p className="text-slate-600 mt-2">Add employee details and their previous employment history</p>
+                    </div>
                 </div>
 
                 <form onSubmit={handleSubmit}>

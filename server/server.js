@@ -6,6 +6,7 @@ const { initPinecone } = require('./services/pineconeService');
 const { initGoogleSheets } = require('./services/googleSheetsService');
 const { initEmailService } = require('./services/emailService');
 const { startReminderService } = require('./services/reminderService');
+const { initGmailMonitoring, startEmailMonitoring } = require('./services/emailMonitorService');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -46,11 +47,15 @@ Promise.all([
     initDB(),
     initPinecone(),
     initGoogleSheets(),
-    initEmailService()
+    initEmailService(),
+    initGmailMonitoring()
 ])
     .then(() => {
         // Start reminder service
         startReminderService();
+
+        // Start email monitoring service (checks for HR replies every 5 minutes)
+        startEmailMonitoring(5);
 
         app.listen(PORT, () => {
             console.log(`Server running on port ${PORT}`);

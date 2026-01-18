@@ -161,4 +161,24 @@ router.get('/responses/check/:checkId', async (req, res) => {
     }
 });
 
+/**
+ * Manually trigger email reply check
+ * POST /api/emails/check-replies
+ */
+router.post('/check-replies', async (req, res) => {
+    try {
+        const { checkForEmailReplies } = require('../services/emailMonitorService');
+        const replies = await checkForEmailReplies();
+
+        res.json({
+            success: true,
+            message: `Checked for email replies. Found ${replies.length} new responses.`,
+            replies: replies
+        });
+    } catch (error) {
+        console.error('Error checking email replies:', error);
+        res.status(500).json({ error: 'Failed to check email replies' });
+    }
+});
+
 module.exports = router;

@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import axios from 'axios';
+import Logo from '../components/Logo';
+import Breadcrumb from '../components/Breadcrumb';
 
 interface Check {
     checkId: string;
@@ -191,19 +193,19 @@ const CheckStatusPage = () => {
             <div className="max-w-6xl mx-auto">
                 {/* Header */}
                 <div className="mb-8">
-                    <div className="flex justify-between items-center">
+                    <Logo />
+                    <div className="mt-6">
+                        <Breadcrumb items={[
+                            { label: 'Home', path: '/' },
+                            { label: 'Verify Checks', path: '/verifier' },
+                            { label: 'Check Status' }
+                        ]} />
                         <div>
                             <h1 className="text-3xl font-bold text-slate-800">Check Status Details</h1>
                             <p className="text-slate-600 mt-2">
                                 {check.checkType} Verification for {caseData?.employeeName}
                             </p>
                         </div>
-                        <Link
-                            to="/verifier"
-                            className="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors font-medium"
-                        >
-                            ← Back to Verifier
-                        </Link>
                     </div>
                 </div>
 

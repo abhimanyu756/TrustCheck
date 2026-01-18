@@ -3,6 +3,8 @@ import { useParams, Link } from 'react-router-dom';
 import axios from 'axios';
 import RiskScoreCard from '../components/RiskScoreCard';
 import VerificationStatus from '../components/VerificationStatus';
+import Logo from '../components/Logo';
+import Breadcrumb from '../components/Breadcrumb';
 
 const VerificationDetails = () => {
     const { id } = useParams();
@@ -51,14 +53,16 @@ const VerificationDetails = () => {
             <div className="max-w-6xl mx-auto">
                 {/* Header */}
                 <div className="mb-8">
-                    <Link
-                        to="/dashboard"
-                        className="text-blue-600 hover:text-blue-800 font-medium mb-4 inline-block"
-                    >
-                        ← Back to Dashboard
-                    </Link>
-                    <h1 className="text-3xl font-bold text-slate-800">Verification Details</h1>
-                    <p className="text-slate-600 mt-1">Request ID: {id}</p>
+                    <Logo />
+                    <div className="mt-6">
+                        <Breadcrumb items={[
+                            { label: 'Home', path: '/' },
+                            { label: 'Dashboard', path: '/dashboard' },
+                            { label: 'Verification Details' }
+                        ]} />
+                        <h1 className="text-3xl font-bold text-slate-800">Verification Details</h1>
+                        <p className="text-slate-600 mt-1">Request ID: {id}</p>
+                    </div>
                 </div>
 
                 {/* Main Content */}

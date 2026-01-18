@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import axios from 'axios';
+import Logo from '../components/Logo';
+import Breadcrumb from '../components/Breadcrumb';
 
 interface Case {
     caseId: string;
@@ -70,23 +72,25 @@ const ClientCases = () => {
             <div className="max-w-7xl mx-auto">
                 {/* Header */}
                 <div className="mb-8">
-                    <Link
-                        to="/clients"
-                        className="text-blue-600 hover:text-blue-800 font-medium mb-4 inline-block"
-                    >
-                        ← Back to Clients
-                    </Link>
-                    <div className="flex justify-between items-center">
-                        <div>
-                            <h1 className="text-3xl font-bold text-slate-800">Employee Cases</h1>
-                            <p className="text-slate-600 mt-2">{cases.length} employee verification{cases.length !== 1 ? 's' : ''}</p>
+                    <Logo />
+                    <div className="mt-6">
+                        <Breadcrumb items={[
+                            { label: 'Home', path: '/' },
+                            { label: 'Client Management', path: '/clients' },
+                            { label: 'Employee Cases' }
+                        ]} />
+                        <div className="flex justify-between items-center">
+                            <div>
+                                <h1 className="text-3xl font-bold text-slate-800">Employee Cases</h1>
+                                <p className="text-slate-600 mt-2">{cases.length} employee verification{cases.length !== 1 ? 's' : ''}</p>
+                            </div>
+                            <Link
+                                to={`/clients/${clientId}/employees/add`}
+                                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                            >
+                                + Add More Employees
+                            </Link>
                         </div>
-                        <Link
-                            to={`/clients/${clientId}/employees/add`}
-                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
-                        >
-                            + Add More Employees
-                        </Link>
                     </div>
                 </div>
 

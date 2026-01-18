@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import Logo from '../components/Logo';
+import Breadcrumb from '../components/Breadcrumb';
 
 const SPECIAL_INSTRUCTIONS = [
     { id: 'uan_30day_tolerance', label: 'UAN: 30-day tenure difference tolerance (tag as Green)' },
@@ -75,8 +77,16 @@ const AddClient = () => {
             <div className="max-w-4xl mx-auto">
                 {/* Header */}
                 <div className="mb-8">
-                    <h1 className="text-3xl font-bold text-slate-800">Add New Client</h1>
-                    <p className="text-slate-600 mt-2">Configure client details and verification preferences (SKU)</p>
+                    <Logo />
+                    <div className="mt-6">
+                        <Breadcrumb items={[
+                            { label: 'Home', path: '/' },
+                            { label: 'Client Management', path: '/clients' },
+                            { label: 'Add New Client' }
+                        ]} />
+                        <h1 className="text-3xl font-bold text-slate-800">Add New Client</h1>
+                        <p className="text-slate-600 mt-2">Configure client details and verification preferences (SKU)</p>
+                    </div>
                 </div>
 
                 {/* Form */}

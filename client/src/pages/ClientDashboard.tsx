@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
+import Logo from '../components/Logo';
+import Breadcrumb from '../components/Breadcrumb';
 
 interface Client {
     clientId: string;
@@ -46,24 +48,25 @@ const ClientDashboard = () => {
         <div className="min-h-screen bg-slate-50 py-8 px-4">
             <div className="max-w-7xl mx-auto">
                 {/* Header */}
-                <div className="flex justify-between items-center mb-8">
-                    <div>
-                        <h1 className="text-3xl font-bold text-slate-800">Client Management</h1>
-                        <p className="text-slate-600 mt-2">Manage client companies and employee verifications</p>
-                    </div>
-                    <div className="flex gap-3">
-                        <Link
-                            to="/"
-                            className="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors font-medium"
-                        >
-                            ← Back to Home
-                        </Link>
-                        <Link
-                            to="/clients/add"
-                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
-                        >
-                            + Add New Client
-                        </Link>
+                <div className="mb-8">
+                    <Logo />
+                    <div className="mt-6">
+                        <Breadcrumb items={[
+                            { label: 'Home', path: '/' },
+                            { label: 'Client Management' }
+                        ]} />
+                        <div className="flex justify-between items-center">
+                            <div>
+                                <h1 className="text-3xl font-bold text-slate-800">Client Management</h1>
+                                <p className="text-slate-600 mt-2">Manage client companies and employee verifications</p>
+                            </div>
+                            <Link
+                                to="/clients/add"
+                                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                            >
+                                + Add New Client
+                            </Link>
+                        </div>
                     </div>
                 </div>
 

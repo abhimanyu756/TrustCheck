@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import axios from 'axios';
+import Logo from '../components/Logo';
+import Breadcrumb from '../components/Breadcrumb';
 
 interface Check {
     checkId: string;
@@ -117,16 +119,19 @@ const CaseDetails = () => {
             <div className="max-w-6xl mx-auto">
                 {/* Header */}
                 <div className="mb-8">
-                    <Link
-                        to="/clients"
-                        className="text-blue-600 hover:text-blue-800 font-medium mb-4 inline-block"
-                    >
-                        ← Back to Clients
-                    </Link>
-                    <div>
-                        <h1 className="text-3xl font-bold text-slate-800">{caseData.employeeName}</h1>
-                        <p className="text-slate-600 mt-1">{caseData.positionApplied}</p>
-                        <p className="text-sm text-slate-500 mt-1">Case ID: {caseData.caseId}</p>
+                    <Logo />
+                    <div className="mt-6">
+                        <Breadcrumb items={[
+                            { label: 'Home', path: '/' },
+                            { label: 'Client Management', path: '/clients' },
+                            { label: 'Employee Cases', path: '/clients' },
+                            { label: caseData.employeeName }
+                        ]} />
+                        <div>
+                            <h1 className="text-3xl font-bold text-slate-800">{caseData.employeeName}</h1>
+                            <p className="text-slate-600 mt-1">{caseData.positionApplied}</p>
+                            <p className="text-sm text-slate-500 mt-1">Case ID: {caseData.caseId}</p>
+                        </div>
                     </div>
                 </div>
 
