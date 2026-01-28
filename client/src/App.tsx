@@ -17,7 +17,11 @@ import StatusDashboard from './pages/StatusDashboard';
 import SimpleHome from './pages/SimpleHome';
 import EmailInbox from './pages/EmailInbox';
 import EmailThreadView from './pages/EmailThreadView';
+import GreenZoneDashboard from './pages/GreenZoneDashboard';
+import RedZoneDashboard from './pages/RedZoneDashboard';
+import ComparisonDetailsView from './pages/ComparisonDetailsView';
 import { ToastProvider } from './contexts/ToastContext';
+import ExtractedDataView from './pages/ExtractedDataView';
 
 // Types
 interface AnalysisResponse {
@@ -275,6 +279,10 @@ function App() {
           <Route path="/emails" element={<EmailInbox />} />
           <Route path="/emails/:checkId" element={<EmailInbox />} />
           <Route path="/email-thread/:emailId" element={<EmailThreadView />} />
+          <Route path="/zones/green" element={<GreenZoneDashboard />} />
+          <Route path="/zones/red" element={<RedZoneDashboard />} />
+          <Route path="/zones/comparison/:checkId" element={<ComparisonDetailsView />} />
+          <Route path="/cases/:caseId/extracted-data" element={<ExtractedDataView />} />
         </Routes>
       </BrowserRouter>
     </ToastProvider>

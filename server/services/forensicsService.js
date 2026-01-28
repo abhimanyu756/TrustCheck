@@ -1,8 +1,9 @@
 const pdfParse = require('pdf-parse');
-const { GoogleGenerativeAI } = require("@google/generative-ai");
+const { GoogleGenAI } = require("@google/genai");
 require('dotenv').config();
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const client = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+const MODEL_NAME = "gemini-2.5-flash";
 
 /**
  * Extract PDF metadata and analyze for tampering
@@ -19,8 +20,6 @@ async function analyzePDFMetadata(fileBuffer) {
     };
 
     // Use Gemini to analyze metadata for suspicious patterns
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-
     const prompt = `
 You are a forensic document analyst. Analyze this PDF metadata for signs of tampering or fraud.
 
@@ -52,8 +51,11 @@ Return JSON:
 }
 `;
 
-    const result = await model.generateContent(prompt);
-    const response = result.response.text();
+    const result = await client.models.generateContent({
+      model: MODEL_NAME,
+      contents: [prompt]
+    });
+    const response = result.text;
 
     // Try to extract JSON from the response
     let analysisData;
@@ -105,8 +107,6 @@ Return JSON:
  */
 async function analyzeSentiment(hrMessages) {
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-
     const prompt = `
 You are an expert in detecting deception and negative sentiment in professional communication.
 
@@ -135,8 +135,11 @@ Return JSON:
 }
 `;
 
-    const result = await model.generateContent(prompt);
-    const response = result.response.text();
+    const result = await client.models.generateContent({
+      model: MODEL_NAME,
+      contents: [prompt]
+    });
+    const response = result.text;
 
     // Try to extract JSON from the response
     try {

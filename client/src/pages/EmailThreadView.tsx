@@ -150,12 +150,52 @@ const EmailThreadView = () => {
 
                         <div className="p-6">
                             <div className="prose max-w-none">
-                                <div
-                                    className="text-slate-700 leading-relaxed whitespace-pre-wrap"
-                                    style={{ fontFamily: 'Arial, sans-serif', lineHeight: '1.6' }}
-                                >
-                                    {email.body}
-                                </div>
+                                {/* Smart rendering: detect if body is HTML or plain text */}
+                                {email.body.trim().startsWith('<!DOCTYPE') || email.body.includes('<html') ? (
+                                    /* Render as HTML */
+                                    <div
+                                        className="email-content"
+                                        dangerouslySetInnerHTML={{ __html: email.body }}
+                                        style={{
+                                            fontFamily: 'Arial, sans-serif',
+                                            lineHeight: '1.6',
+                                            color: '#333'
+                                        }}
+                                    />
+                                ) : email.body.includes('body { font-family') || email.body.includes('.container {') ? (
+                                    /* Old format: CSS code mixed with text - extract just the text content */
+                                    <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg p-6 border-2 border-blue-200">
+                                        <div className="bg-white rounded-lg p-6 shadow-sm">
+                                            <div className="flex items-center gap-3 mb-4 pb-4 border-b-2 border-blue-200">
+                                                <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-lg flex items-center justify-center">
+                                                    <span className="text-white font-bold text-xl">T</span>
+                                                </div>
+                                                <div>
+                                                    <h3 className="text-xl font-bold text-slate-800">🔍 TrustCheck Background Verification</h3>
+                                                    <p className="text-sm text-slate-600">Enterprise Background Verification</p>
+                                                </div>
+                                            </div>
+                                            <div className="space-y-4 text-slate-700">
+                                                {email.body
+                                                    .replace(/body \{[^}]+\}/g, '')
+                                                    .replace(/\.[a-z-]+ \{[^}]+\}/g, '')
+                                                    .split('\n')
+                                                    .filter(line => line.trim() && !line.includes('{') && !line.includes('}'))
+                                                    .map((line, idx) => (
+                                                        <p key={idx} className="leading-relaxed">
+                                                            {line.trim()}
+                                                        </p>
+                                                    ))
+                                                }
+                                            </div>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    /* Plain text */
+                                    <div className="text-slate-700 whitespace-pre-wrap leading-relaxed">
+                                        {email.body}
+                                    </div>
+                                )}
                             </div>
 
                             {email.googleSheetsUrl && (
@@ -214,11 +254,60 @@ const EmailThreadView = () => {
                                 </div>
 
                                 <h3 className="font-semibold text-slate-800 mb-3">Verification Data Provided:</h3>
-                                <div className="bg-slate-50 rounded-lg p-4">
-                                    <pre className="text-sm text-slate-700 overflow-auto whitespace-pre-wrap">
-                                        {JSON.stringify(response.responseData, null, 2)}
-                                    </pre>
-                                </div>
+
+                                {/* Check if HR provided Google Sheet link */}
+                                {response.responseData?.hasGoogleSheetLink ? (
+                                    <div className="space-y-4">
+                                        <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-4">
+                                            <div className="flex items-center gap-3 mb-2">
+                                                <span className="text-3xl">📊</span>
+                                                <div>
+                                                    <p className="font-semibold text-slate-800">HR Response Method: Google Sheets</p>
+                                                    <p className="text-sm text-slate-600">{response.responseData.extractedInfo?.message || 'HR provided Google Sheet link for verification'}</p>
+                                                </div>
+                                            </div>
+                                            {response.responseData.googleSheetUrl && (
+                                                <a
+                                                    href={response.responseData.googleSheetUrl}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="inline-block mt-3 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm"
+                                                >
+                                                    View Google Sheet →
+                                                </a>
+                                            )}
+                                        </div>
+
+                                        {/* Show raw response if available */}
+                                        {response.responseData.rawResponse && (
+                                            <div className="bg-slate-50 rounded-lg p-4">
+                                                <p className="text-xs font-semibold text-slate-600 mb-2">HR's Email Message:</p>
+                                                <p className="text-sm text-slate-700 whitespace-pre-wrap">
+                                                    {response.responseData.rawResponse.split(/On .+wrote:/i)[0].trim()}
+                                                </p>
+                                            </div>
+                                        )}
+                                    </div>
+                                ) : response.responseData?.extractedInfo && Object.keys(response.responseData.extractedInfo).length > 0 ? (
+                                    /* Display structured data if available */
+                                    <div className="bg-slate-50 rounded-lg p-4 space-y-3">
+                                        {Object.entries(response.responseData.extractedInfo).map(([key, value]) => (
+                                            <div key={key} className="flex border-b border-slate-200 pb-2 last:border-0">
+                                                <span className="font-semibold text-slate-700 w-1/3 capitalize">
+                                                    {key.replace(/([A-Z])/g, ' $1').trim()}:
+                                                </span>
+                                                <span className="text-slate-800 w-2/3">{String(value)}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    /* Fallback: show raw response */
+                                    <div className="bg-slate-50 rounded-lg p-4">
+                                        <p className="text-sm text-slate-700 whitespace-pre-wrap">
+                                            {response.responseData?.rawResponse || 'No response data available'}
+                                        </p>
+                                    </div>
+                                )}
 
                                 <div className="mt-4 flex gap-3">
                                     <Link
@@ -227,9 +316,9 @@ const EmailThreadView = () => {
                                     >
                                         View Full Check Status →
                                     </Link>
-                                    {email.googleSheetsUrl && (
+                                    {(email.googleSheetsUrl || response.responseData?.googleSheetUrl) && (
                                         <a
-                                            href={email.googleSheetsUrl}
+                                            href={email.googleSheetsUrl || response.responseData?.googleSheetUrl}
                                             target="_blank"
                                             rel="noopener noreferrer"
                                             className="px-4 py-2 border-2 border-blue-600 text-blue-600 rounded-lg hover:bg-blue-50 transition-colors font-medium text-sm"

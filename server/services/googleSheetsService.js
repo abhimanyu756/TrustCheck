@@ -88,28 +88,34 @@ const createVerificationSheet = async (candidateData, requestId) => {
         const spreadsheetId = createResponse.data.spreadsheetId;
         const sheetId = createResponse.data.sheets[0].properties.sheetId; // Get actual sheet ID
 
-        // Prepare data for the sheet
+        // Prepare data for the sheet with Antecedent (Question), Stated (Value), HR Verified Value, and Comments
         const values = [
-            ['Field', 'Candidate Claims', 'HR Verified Value', 'Comments'],
-            ['Employee Name', candidateData.employeeName || '', '', ''],
-            ['Company Name', candidateData.companyName || '', '', ''],
-            ['Designation/Role', candidateData.designation || '', '', ''],
-            ['Employment Dates', candidateData.dates || '', '', ''],
-            ['Salary/CTC', candidateData.salary || '', '', ''],
-            ['Department', candidateData.department || '', '', ''],
-            ['Reason for Leaving', '', '', ''],
-            ['Eligible for Rehire?', '', 'Yes/No', ''],
-            ['Performance Rating', '', '1-5', ''],
-            ['', '', '', ''],
-            ['HR Name', '', '', ''],
-            ['HR Email', '', '', ''],
-            ['Verification Date', '', '', ''],
+            ['Antecedent (Question)', 'Stated (Value)', 'HR Verified Value', 'Comments'],
+            ['Is the document authentic?', 'N/A', '', ''],
+            ['Tenure', candidateData.dates || 'N/A', '', ''],
+            ['Cost to Company', candidateData.salary || 'N/A', '', ''],
+            ['Employee Code', 'N/A', '', ''],
+            ['Reporting Manager (Designation, Email ID & Tele No.)', 'N/A', '', ''],
+            ['Reason for Leaving', 'N/A', '', ''],
+            ['Is the candidate/Applicant eligible for rehire?', 'N/A', '', ''],
+            ['Referee\'s Details', 'N/A', '', ''],
+            ['Any other comments: (Please Specify)', 'N/A', '', ''],
+            ['Designation', candidateData.designation || 'N/A', '', ''],
+            ['Feedback on account of Disciplinary/Ethical/Integrity conduct on the job.', 'N/A', '', ''],
+            ['Mode of Response', 'N/A', '', ''],
+            ['Exit Formalities', 'N/A', '', ''],
+            ['Official Email id', 'N/A', '', ''],
+            ['Company Name', candidateData.companyName || 'N/A', '', ''],
+            ['Verification via', 'N/A', '', ''],
+            ['Vendor Name', 'N/A', '', ''],
+            ['Initiation Date', new Date().toISOString().split('T')[0], '', ''],
+            ['Report Received Date', 'N/A', '', ''],
         ];
 
         // Update sheet with data
         await sheets.spreadsheets.values.update({
             spreadsheetId,
-            range: 'Verification Form!A1:D14',
+            range: 'Verification Form!A1:D20',
             valueInputOption: 'RAW',
             requestBody: { values },
         });
@@ -123,29 +129,30 @@ const createVerificationSheet = async (candidateData, requestId) => {
                     {
                         repeatCell: {
                             range: {
-                                sheetId: sheetId, // Use actual sheet ID
+                                sheetId: sheetId,
                                 startRowIndex: 0,
                                 endRowIndex: 1,
                             },
                             cell: {
                                 userEnteredFormat: {
-                                    backgroundColor: { red: 0.2, green: 0.5, blue: 0.8 },
-                                    textFormat: { bold: true, foregroundColor: { red: 1, green: 1, blue: 1 } },
+                                    backgroundColor: { red: 0.4, green: 0.7, blue: 1 },
+                                    textFormat: { bold: true, foregroundColor: { red: 0, green: 0, blue: 0 } },
+                                    horizontalAlignment: 'CENTER'
                                 }
                             },
-                            fields: 'userEnteredFormat(backgroundColor,textFormat)',
+                            fields: 'userEnteredFormat(backgroundColor,textFormat,horizontalAlignment)',
                         }
                     },
-                    // Protect candidate claims column
+                    // Protect Antecedent (Question) and Stated (Value) columns
                     {
                         addProtectedRange: {
                             protectedRange: {
                                 range: {
-                                    sheetId: sheetId, // Use actual sheet ID
-                                    startColumnIndex: 1,
-                                    endColumnIndex: 2,
+                                    sheetId: sheetId,
+                                    startColumnIndex: 0,
+                                    endColumnIndex: 2, // Protect first two columns (A and B)
                                 },
-                                description: 'Candidate claims are read-only',
+                                description: 'Questions and Employee Data are read-only',
                                 warningOnly: true,
                             }
                         }
@@ -154,10 +161,10 @@ const createVerificationSheet = async (candidateData, requestId) => {
                     {
                         autoResizeDimensions: {
                             dimensions: {
-                                sheetId: sheetId, // Use actual sheet ID
+                                sheetId: sheetId,
                                 dimension: 'COLUMNS',
                                 startIndex: 0,
-                                endIndex: 4,
+                                endIndex: 4, // Resize A, B, C, D
                             }
                         }
                     }
@@ -193,34 +200,38 @@ const createVerificationSheet = async (candidateData, requestId) => {
     }
 };
 
-/**
- * Read HR responses from the sheet
- */
 const getSheetResponses = async (spreadsheetId) => {
     try {
         // Mock mode
         if (!sheets || spreadsheetId.startsWith('mock_')) {
             console.log('📝 MOCK: Reading sheet responses');
             return {
-                employeeName: 'John Doe',
-                companyName: 'Tech Corp',
-                designation: 'Senior Developer',
-                dates: '2020-2023',
-                salary: '₹15 LPA',
-                department: 'Engineering',
-                reasonForLeaving: 'Better opportunity',
-                eligibleForRehire: 'Yes',
-                performanceRating: '4',
-                hrName: 'Jane Smith',
-                hrEmail: 'jane@techcorp.com',
-                verificationDate: new Date().toISOString().split('T')[0],
+                documentAuthentic: 'Yes',
+                tenure: 'April 20, 2021 To May 20, 2023',
+                costToCompany: 'INR 10,90,568/-PA',
+                employeeCode: 'FX0380',
+                reportingManager: 'N/A',
+                reasonForLeaving: 'Career Advancement',
+                eligibleForRehire: 'N/A',
+                refereeDetails: 'N/A',
+                otherComments: 'N/A',
+                designation: 'Customer Success Manager',
+                disciplinaryFeedback: 'N/A',
+                modeOfResponse: 'N/A',
+                exitFormalities: 'N/A',
+                officialEmail: 'Not Mentioned',
+                companyName: 'FleetX Technologies (P) Ltd',
+                verificationVia: 'N/A',
+                vendorName: 'N/A',
+                initiationDate: new Date().toISOString().split('T')[0],
+                reportReceivedDate: 'N/A',
                 isMock: true
             };
         }
 
         const response = await sheets.spreadsheets.values.get({
             spreadsheetId,
-            range: 'Verification Form!A1:D14',
+            range: 'Verification Form!A1:D20',
         });
 
         const rows = response.data.values;
@@ -228,25 +239,34 @@ const getSheetResponses = async (spreadsheetId) => {
             return null; // No data filled yet
         }
 
-        // Parse the responses (column C contains HR verified values)
+        // Parse the responses (column C contains Verified Values, D contains Comments)
+        // Use column C (index 2) as the verified value. If empty, it means HR hasn't verified it yet or left it blank.
+        // For 'Any other comments' (row 10), the answer is in column C.
         const hrResponses = {
-            employeeName: rows[1]?.[2] || '',
-            companyName: rows[2]?.[2] || '',
-            designation: rows[3]?.[2] || '',
-            dates: rows[4]?.[2] || '',
-            salary: rows[5]?.[2] || '',
-            department: rows[6]?.[2] || '',
-            reasonForLeaving: rows[7]?.[2] || '',
-            eligibleForRehire: rows[8]?.[2] || '',
-            performanceRating: rows[9]?.[2] || '',
-            hrName: rows[11]?.[2] || '',
-            hrEmail: rows[12]?.[2] || '',
-            verificationDate: rows[13]?.[2] || '',
+            documentAuthentic: rows[1]?.[2] || '',
+            tenure: rows[2]?.[2] || '',
+            costToCompany: rows[3]?.[2] || '',
+            employeeCode: rows[4]?.[2] || '',
+            reportingManager: rows[5]?.[2] || '',
+            reasonForLeaving: rows[6]?.[2] || '',
+            eligibleForRehire: rows[7]?.[2] || '',
+            refereeDetails: rows[8]?.[2] || '',
+            otherComments: rows[9]?.[2] || '',
+            designation: rows[10]?.[2] || '',
+            disciplinaryFeedback: rows[11]?.[2] || '',
+            modeOfResponse: rows[12]?.[2] || '',
+            exitFormalities: rows[13]?.[2] || '',
+            officialEmail: rows[14]?.[2] || '',
+            companyName: rows[15]?.[2] || '',
+            verificationVia: rows[16]?.[2] || '',
+            vendorName: rows[17]?.[2] || '',
+            initiationDate: rows[18]?.[2] || '',
+            reportReceivedDate: rows[19]?.[2] || '',
             isMock: false
         };
 
         // Check if HR has filled at least some fields
-        const filledFields = Object.values(hrResponses).filter(v => v && v.trim()).length;
+        const filledFields = Object.values(hrResponses).filter(v => v && v.trim() && v !== 'N/A').length;
         if (filledFields < 3) {
             return null; // Not enough data filled
         }

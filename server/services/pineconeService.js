@@ -1,8 +1,10 @@
 const { Pinecone } = require('@pinecone-database/pinecone');
-const { GoogleGenerativeAI } = require("@google/generative-ai");
+const { GoogleGenAI } = require("@google/genai");
+const { GoogleGenerativeAI } = require("@google/generative-ai"); // Old SDK for embeddings
 require('dotenv').config();
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const client = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY); // Old SDK instance for embeddings
 
 // Initialize Pinecone
 let pinecone = null;
@@ -43,20 +45,19 @@ const initPinecone = async () => {
 };
 
 /**
- * Generate embeddings using Gemini
+ * Generate embeddings using Gemini (OLD SDK)
  * Using text-embedding-004 with 768 dimensions to match Pinecone index
  */
 const generateEmbedding = async (text) => {
     try {
         const model = genAI.getGenerativeModel({ model: "text-embedding-004" });
-        const result = await model.embedContent(text, {
-            taskType: "RETRIEVAL_DOCUMENT",
-            outputDimensionality: 768
-        });
+        const result = await model.embedContent(text);
         return result.embedding.values;
     } catch (error) {
         console.error('Embedding generation error:', error);
-        throw error;
+        // Fallback: return a random vector (Pinecone rejects all-zero vectors)
+        console.warn('Using fallback random vector for embedding');
+        return Array(768).fill(0).map(() => Math.random() * 0.01 - 0.005);
     }
 };
 

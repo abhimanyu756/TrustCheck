@@ -40,9 +40,9 @@ interface Document {
 const VerifierDashboard = () => {
     const { showToast } = useToast();
     const [clients, setClients] = useState<Client[]>([]);
-    const [selectedClient, setSelectedClient] = useState<string>('');
+    const [selectedClient, setSelectedClient] = useState<string>(() => sessionStorage.getItem('verifier_selectedClient') || '');
     const [cases, setCases] = useState<Case[]>([]);
-    const [selectedCase, setSelectedCase] = useState<string>('');
+    const [selectedCase, setSelectedCase] = useState<string>(() => sessionStorage.getItem('verifier_selectedCase') || '');
     const [checks, setChecks] = useState<Check[]>([]);
     const [documents, setDocuments] = useState<{ [checkId: string]: Document[] }>({});
     const [executing, setExecuting] = useState<string | null>(null);
@@ -199,8 +199,11 @@ const VerifierDashboard = () => {
                             <select
                                 value={selectedClient}
                                 onChange={(e) => {
-                                    setSelectedClient(e.target.value);
+                                    const newClient = e.target.value;
+                                    setSelectedClient(newClient);
+                                    sessionStorage.setItem('verifier_selectedClient', newClient);
                                     setSelectedCase('');
+                                    sessionStorage.removeItem('verifier_selectedCase');
                                     setChecks([]);
                                 }}
                                 className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
@@ -222,7 +225,10 @@ const VerifierDashboard = () => {
                                     {cases.map(caseItem => (
                                         <button
                                             key={caseItem.caseId}
-                                            onClick={() => setSelectedCase(caseItem.caseId)}
+                                            onClick={() => {
+                                                setSelectedCase(caseItem.caseId);
+                                                sessionStorage.setItem('verifier_selectedCase', caseItem.caseId);
+                                            }}
                                             className={`w-full text-left px-4 py-3 rounded-lg border-2 transition-all ${selectedCase === caseItem.caseId
                                                 ? 'border-blue-500 bg-blue-50'
                                                 : 'border-slate-200 hover:border-blue-300'
@@ -260,6 +266,12 @@ const VerifierDashboard = () => {
                                         >
                                             {executing === 'all' ? 'Executing...' : 'Execute All Checks'}
                                         </button>
+                                        <Link
+                                            to={`/cases/${selectedCase}/extracted-data`}
+                                            className="ml-4 px-6 py-3 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors font-medium"
+                                        >
+                                            View Extracted Data
+                                        </Link>
                                     </div>
                                 </div>
 

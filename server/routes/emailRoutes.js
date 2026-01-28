@@ -167,17 +167,47 @@ router.get('/responses/check/:checkId', async (req, res) => {
  */
 router.post('/check-replies', async (req, res) => {
     try {
-        const { checkForEmailReplies } = require('../services/emailMonitorService');
-        const replies = await checkForEmailReplies();
+        const { manualEmailCheck } = require('../services/emailMonitorService');
+        const replies = await manualEmailCheck();
 
         res.json({
             success: true,
             message: `Checked for email replies. Found ${replies.length} new responses.`,
-            replies: replies
+            replies: replies.map(r => ({
+                checkId: r.checkId,
+                from: r.from,
+                subject: r.subject,
+                hasData: Object.keys(r.responseData?.extractedInfo || {}).length > 0
+            }))
         });
     } catch (error) {
         console.error('Error checking email replies:', error);
-        res.status(500).json({ error: 'Failed to check email replies' });
+        res.status(500).json({
+            error: 'Failed to check email replies',
+            details: error.message
+        });
+    }
+});
+
+/**
+ * Rebuild email-to-check mapping (DEBUG)
+ * POST /api/emails/debug/rebuild-mapping
+ */
+router.post('/debug/rebuild-mapping', async (req, res) => {
+    try {
+        const { buildEmailCheckMapping } = require('../services/emailMonitorService');
+        await buildEmailCheckMapping();
+
+        res.json({
+            success: true,
+            message: 'Email-to-check mapping rebuilt successfully'
+        });
+    } catch (error) {
+        console.error('Error rebuilding mapping:', error);
+        res.status(500).json({
+            error: 'Failed to rebuild mapping',
+            details: error.message
+        });
     }
 });
 

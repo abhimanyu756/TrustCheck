@@ -19,6 +19,12 @@ const SimpleHome = () => {
                         </div>
                         <div className="flex gap-3">
                             <Link
+                                to="/status"
+                                className="px-4 py-2 bg-gradient-to-r from-green-600 to-red-600 text-white rounded-lg hover:from-green-700 hover:to-red-700 transition-colors font-medium text-sm flex items-center gap-2"
+                            >
+                                <span>🎯</span> Risk Zones
+                            </Link>
+                            <Link
                                 to="/verifier"
                                 className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium text-sm flex items-center gap-2"
                             >
@@ -26,13 +32,13 @@ const SimpleHome = () => {
                             </Link>
                             <Link
                                 to="/uploader"
-                                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium text-sm flex items-center gap-2"
+                                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm flex items-center gap-2"
                             >
                                 <span>📁</span> Upload Documents
                             </Link>
                             <Link
                                 to="/clients"
-                                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm flex items-center gap-2"
+                                className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-medium text-sm flex items-center gap-2"
                             >
                                 <span>🏢</span> Client Management
                             </Link>
@@ -60,7 +66,23 @@ const SimpleHome = () => {
                 </div>
 
                 {/* Quick Action Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto mt-16">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 max-w-7xl mx-auto mt-16">
+                    <Link to="/zones/green" className="bg-white rounded-2xl p-10 border-2 border-slate-200 hover:border-green-500 hover:shadow-2xl transition-all group">
+                        <div className="w-20 h-20 bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform">
+                            <span className="text-4xl">✅</span>
+                        </div>
+                        <h3 className="font-bold text-slate-800 mb-3 text-xl">Green Zone</h3>
+                        <p className="text-slate-600">Auto-approved verifications with low risk scores</p>
+                    </Link>
+
+                    <Link to="/zones/red" className="bg-white rounded-2xl p-10 border-2 border-slate-200 hover:border-red-500 hover:shadow-2xl transition-all group">
+                        <div className="w-20 h-20 bg-gradient-to-br from-red-500 to-rose-600 rounded-2xl flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform">
+                            <span className="text-4xl">⚠️</span>
+                        </div>
+                        <h3 className="font-bold text-slate-800 mb-3 text-xl">Red Zone</h3>
+                        <p className="text-slate-600">Checks requiring manual supervisor review</p>
+                    </Link>
+
                     <Link to="/status" className="bg-white rounded-2xl p-10 border-2 border-slate-200 hover:border-blue-500 hover:shadow-2xl transition-all group">
                         <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform">
                             <span className="text-4xl">📊</span>
@@ -69,20 +91,12 @@ const SimpleHome = () => {
                         <p className="text-slate-600">Monitor all verification checks and risk zones in real-time</p>
                     </Link>
 
-                    <Link to="/clients" className="bg-white rounded-2xl p-10 border-2 border-slate-200 hover:border-green-500 hover:shadow-2xl transition-all group">
-                        <div className="w-20 h-20 bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform">
+                    <Link to="/clients" className="bg-white rounded-2xl p-10 border-2 border-slate-200 hover:border-indigo-500 hover:shadow-2xl transition-all group">
+                        <div className="w-20 h-20 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform">
                             <span className="text-4xl">🏢</span>
                         </div>
                         <h3 className="font-bold text-slate-800 mb-3 text-xl">Manage Clients</h3>
                         <p className="text-slate-600">Add clients and configure verification settings and SKUs</p>
-                    </Link>
-
-                    <Link to="/uploader" className="bg-white rounded-2xl p-10 border-2 border-slate-200 hover:border-purple-500 hover:shadow-2xl transition-all group">
-                        <div className="w-20 h-20 bg-gradient-to-br from-purple-500 to-pink-600 rounded-2xl flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform">
-                            <span className="text-4xl">📁</span>
-                        </div>
-                        <h3 className="font-bold text-slate-800 mb-3 text-xl">Upload Documents</h3>
-                        <p className="text-slate-600">Upload verification documents for background checks</p>
                     </Link>
                 </div>
 

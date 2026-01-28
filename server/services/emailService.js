@@ -202,8 +202,11 @@ const templates = {
     `
 };
 
+// Add this to your emailService.js - Updated sendVerificationEmail function
+
 /**
  * Send initial verification email with Google Sheets link
+ * UPDATED: Now includes checkId in subject for better tracking
  */
 async function sendVerificationEmail(hrEmail, candidateName, sheetUrl, requestId, checkId = null) {
     try {
@@ -212,23 +215,29 @@ async function sendVerificationEmail(hrEmail, candidateName, sheetUrl, requestId
             console.log('=================================================');
             console.log('📧 MOCK EMAIL: Initial Verification');
             console.log(`To: ${hrEmail}`);
-            console.log(`Subject: Background Verification Request - ${candidateName}`);
+            console.log(`Subject: Background Verification Request - ${candidateName} [Check: ${checkId || requestId}]`);
             console.log(`Sheet URL: ${sheetUrl}`);
-            console.log(`Request ID: ${requestId}`);
+            console.log(`Check ID: ${checkId || requestId}`);
             console.log('=================================================');
 
             // Log activity even in mock mode
             if (checkId) {
                 const { logActivity } = require('./database');
                 const template = handlebars.compile(templates.initialVerification);
-                const htmlBody = template({ candidateName, sheetUrl, requestId });
+                const htmlBody = template({
+                    candidateName,
+                    sheetUrl,
+                    requestId: checkId || requestId,
+                    checkId: checkId || requestId
+                });
 
                 await logActivity('check', checkId, 'EMAIL_SENT', `Verification email sent to ${hrEmail}`, {
                     hrEmail,
-                    subject: `Background Verification Request - ${candidateName}`,
-                    emailBody: htmlBody.replace(/<[^>]*>/g, ''), // Strip HTML for plain text
+                    subject: `Background Verification Request - ${candidateName} [Check: ${checkId || requestId}]`,
+                    emailBody: htmlBody,  // Store full HTML for proper rendering
                     googleSheetsUrl: sheetUrl,
-                    status: 'SENT'
+                    status: 'SENT',
+                    messageId: `mock_${Date.now()}`
                 });
             }
 
@@ -236,28 +245,42 @@ async function sendVerificationEmail(hrEmail, candidateName, sheetUrl, requestId
         }
 
         const template = handlebars.compile(templates.initialVerification);
-        const html = template({ candidateName, sheetUrl, requestId });
+        const html = template({
+            candidateName,
+            sheetUrl,
+            requestId: checkId || requestId,
+            checkId: checkId || requestId
+        });
+
+        // Include check ID in subject for easier tracking
+        const subject = `Background Verification Request - ${candidateName} [Check: ${checkId || requestId}]`;
 
         const mailOptions = {
             from: `TrustCheck AI <${process.env.EMAIL_USER}>`,
             to: hrEmail,
-            subject: `Background Verification Request - ${candidateName}`,
+            subject: subject,
             html: html,
+            // Add custom headers for better threading
+            headers: {
+                'X-TrustCheck-ID': checkId || requestId,
+                'X-Check-Type': 'EMPLOYMENT_VERIFICATION'
+            }
         };
 
         const info = await transporter.sendMail(mailOptions);
         console.log(`✅ Verification email sent to ${hrEmail}: ${info.messageId}`);
 
-        // Log activity
+        // Log activity with message ID for tracking
         if (checkId) {
             const { logActivity } = require('./database');
             await logActivity('check', checkId, 'EMAIL_SENT', `Verification email sent to ${hrEmail}`, {
                 hrEmail,
                 subject: mailOptions.subject,
-                emailBody: html.replace(/<[^>]*>/g, ''), // Strip HTML for plain text
+                emailBody: html,  // Store full HTML for proper rendering
                 googleSheetsUrl: sheetUrl,
                 status: 'SENT',
-                messageId: info.messageId
+                messageId: info.messageId,
+                gmailMessageId: info.messageId
             });
         }
 

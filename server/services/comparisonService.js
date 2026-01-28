@@ -1,220 +1,417 @@
-const { GoogleGenerativeAI } = require("@google/generative-ai");
+const { GoogleGenAI } = require('@google/genai');
 require('dotenv').config();
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const client = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+const MODEL_NAME = "gemini-2.5-flash";
 
-// Default client rules
-const DEFAULT_CLIENT_RULES = {
-  salaryTolerance: 10, // ±10%
-  datesTolerance: 30, // ±30 days  
-  greenZoneThreshold: 30,
-  redZoneThreshold: 70,
-  scoringWeights: {
-    nameMismatch: 30,
-    salaryMismatch: 20,
-    datesMismatch: 15,
-    notEligibleForRehire: 25,
-    lowPerformance: 10,
-    designationMismatch: 10
+/**
+ * Automated Comparison Service
+ * Compares HR-verified data with employee-submitted data
+ * Applies client-specific rules and assigns to Green/Red zones
+ */
+
+/**
+ * Main comparison function
+ * Compares employee data with HR-verified data and assigns zone
+ */
+async function compareVerificationData(checkId, employeeData, hrData, clientRules) {
+  try {
+    console.log(`\n🔍 Starting comparison for check ${checkId}...`);
+
+    // Step 1: Identify discrepancies
+    const discrepancies = identifyDiscrepancies(employeeData, hrData);
+    console.log(`   Found ${discrepancies.length} discrepancies`);
+
+    // Step 2: Use AI to analyze discrepancies
+    const aiAnalysis = await analyzeDiscrepanciesWithAI(employeeData, hrData, discrepancies);
+
+    // Step 3: Evaluate against client rules
+    const ruleEvaluation = evaluateClientRules(discrepancies, clientRules, aiAnalysis);
+
+    // Step 4: Calculate risk score
+    const riskScore = calculateRiskScore(discrepancies, aiAnalysis, ruleEvaluation);
+
+    // Step 5: Assign zone based on risk score and rules
+    const zone = assignZone(riskScore, discrepancies, ruleEvaluation, clientRules);
+
+    const comparisonResults = {
+      checkId,
+      zone,
+      riskScore,
+      discrepancies,
+      aiAnalysis,
+      ruleEvaluation,
+      comparedAt: new Date().toISOString(),
+      summary: generateSummary(zone, riskScore, discrepancies, aiAnalysis)
+    };
+
+    console.log(`   ✅ Comparison complete: Zone=${zone}, Risk Score=${riskScore}`);
+    return comparisonResults;
+
+  } catch (error) {
+    console.error('Error in comparison:', error);
+    throw error;
   }
-};
-
-/**
- * Fuzzy string matching
- */
-function fuzzyMatch(str1, str2, threshold = 0.8) {
-  if (!str1 || !str2) return false;
-  const s1 = str1.toLowerCase().trim();
-  const s2 = str2.toLowerCase().trim();
-  if (s1 === s2) return true;
-
-  // Simple similarity check
-  const longer = s1.length > s2.length ? s1 : s2;
-  const shorter = s1.length > s2.length ? s2 : s1;
-  if (longer.includes(shorter)) return true;
-
-  return false;
 }
 
 /**
- * Extract numeric value from salary
+ * Identify discrepancies between employee and HR data
  */
-function extractSalary(salaryStr) {
-  if (!salaryStr) return 0;
-  const cleaned = salaryStr.replace(/[₹$,]/g, '').trim();
-  if (cleaned.toLowerCase().includes('lpa')) {
-    return parseFloat(cleaned.replace(/[^0-9.]/g, '')) * 100000;
-  }
-  return parseFloat(cleaned.replace(/[^0-9.]/g, '')) || 0;
-}
-
-/**
- * Calculate percentage difference
- */
-function calculatePercentageDiff(value1, value2) {
-  const num1 = extractSalary(value1);
-  const num2 = extractSalary(value2);
-  if (num1 === 0) return 0;
-  return Math.abs(((num2 - num1) / num1) * 100);
-}
-
-/**
- * Deterministic comparison with client rules
- */
-async function compareWithRules(candidateData, hrData, clientRules = DEFAULT_CLIENT_RULES) {
-  let riskScore = 0;
+function identifyDiscrepancies(employeeData, hrData) {
   const discrepancies = [];
-  const matches = [];
-  const rules = { ...DEFAULT_CLIENT_RULES, ...clientRules };
 
-  // Name comparison
-  if (!fuzzyMatch(candidateData.employeeName, hrData.employeeName)) {
-    riskScore += rules.scoringWeights.nameMismatch;
-    discrepancies.push({
-      field: 'Employee Name',
-      severity: 'CRITICAL',
-      candidate: candidateData.employeeName,
-      hr: hrData.employeeName
-    });
-  } else {
-    matches.push({ field: 'Employee Name' });
-  }
+  // Compare common fields
+  const fieldsToCompare = [
+    { key: 'employeeName', label: 'Employee Name', type: 'string' },
+    { key: 'designation', label: 'Designation', type: 'string' },
+    { key: 'employmentDates', label: 'Employment Dates', type: 'date' },
+    { key: 'salary', label: 'Salary/CTC', type: 'number' },
+    { key: 'reasonForLeaving', label: 'Reason for Leaving', type: 'string' },
+    { key: 'eligibleForRehire', label: 'Eligible for Rehire', type: 'boolean' },
+    { key: 'performanceRating', label: 'Performance Rating', type: 'string' }
+  ];
 
-  // Salary comparison
-  if (candidateData.salary && hrData.salary) {
-    const salaryDiff = calculatePercentageDiff(candidateData.salary, hrData.salary);
-    if (salaryDiff > rules.salaryTolerance) {
-      riskScore += rules.scoringWeights.salaryMismatch;
-      discrepancies.push({
-        field: 'Salary',
-        severity: 'HIGH',
-        candidate: candidateData.salary,
-        hr: hrData.salary,
-        difference: `${salaryDiff.toFixed(1)}%`
-      });
-    } else {
-      matches.push({ field: 'Salary' });
+  for (const field of fieldsToCompare) {
+    const employeeValue = employeeData[field.key];
+    const hrValue = hrData[field.key];
+
+    if (employeeValue && hrValue) {
+      const discrepancy = compareField(field, employeeValue, hrValue);
+      if (discrepancy) {
+        discrepancies.push(discrepancy);
+      }
     }
   }
 
-  // Eligible for rehire
-  if (hrData.eligibleForRehire && hrData.eligibleForRehire.toLowerCase().includes('no')) {
-    riskScore += rules.scoringWeights.notEligibleForRehire;
-    discrepancies.push({
-      field: 'Eligible for Rehire',
-      severity: 'CRITICAL',
-      value: 'No'
-    });
-  } else if (hrData.eligibleForRehire) {
-    matches.push({ field: 'Eligible for Rehire' });
+  return discrepancies;
+}
+
+/**
+ * Compare individual field values
+ */
+function compareField(field, employeeValue, hrValue) {
+  const employeeStr = String(employeeValue).toLowerCase().trim();
+  const hrStr = String(hrValue).toLowerCase().trim();
+
+  if (employeeStr === hrStr) {
+    return null; // No discrepancy
   }
 
-  // Performance rating
-  if (hrData.performanceRating) {
-    const rating = parseInt(hrData.performanceRating);
-    if (rating < 3) {
-      riskScore += rules.scoringWeights.lowPerformance;
-      discrepancies.push({
-        field: 'Performance Rating',
-        severity: 'MEDIUM',
-        value: hrData.performanceRating
-      });
-    } else {
-      matches.push({ field: 'Performance Rating' });
-    }
-  }
+  let severity = 'LOW';
+  let difference = null;
 
-  riskScore = Math.min(riskScore, 100);
+  // Field-specific comparison logic
+  switch (field.type) {
+    case 'number':
+      // For salary, calculate percentage difference
+      const empNum = parseFloat(employeeStr.replace(/[^0-9.]/g, ''));
+      const hrNum = parseFloat(hrStr.replace(/[^0-9.]/g, ''));
+      if (!isNaN(empNum) && !isNaN(hrNum)) {
+        const percentDiff = Math.abs((empNum - hrNum) / hrNum * 100);
+        difference = `${percentDiff.toFixed(1)}%`;
 
-  // Determine zone
-  let zone = 'GREEN';
-  if (riskScore >= rules.redZoneThreshold) {
-    zone = 'RED';
-  } else if (riskScore >= rules.greenZoneThreshold) {
-    zone = 'YELLOW';
+        if (percentDiff > 20) severity = 'HIGH';
+        else if (percentDiff > 10) severity = 'MEDIUM';
+        else severity = 'LOW';
+      }
+      break;
+
+    case 'date':
+      // For dates, check if they're within reasonable range
+      severity = 'MEDIUM';
+      break;
+
+    case 'boolean':
+      // Boolean mismatches are always high severity
+      severity = 'HIGH';
+      break;
+
+    case 'string':
+      // For strings, check similarity
+      const similarity = calculateStringSimilarity(employeeStr, hrStr);
+      if (similarity < 0.5) severity = 'HIGH';
+      else if (similarity < 0.8) severity = 'MEDIUM';
+      else severity = 'LOW';
+      break;
   }
 
   return {
-    riskScore,
-    zone,
-    discrepancies,
-    matches,
-    matchRate: ((matches.length / (matches.length + discrepancies.length)) * 100).toFixed(1)
+    field: field.label,
+    fieldKey: field.key,
+    employeeValue: employeeValue,
+    hrValue: hrValue,
+    severity,
+    difference
   };
 }
 
 /**
- * Compare candidate claims vs HR verified data using Gemini + Rules
+ * Calculate string similarity (simple Levenshtein-based)
  */
-async function compareData(candidateData, hrVerifiedData, clientRules = DEFAULT_CLIENT_RULES) {
-  try {
-    // First, get deterministic rule-based comparison
-    const ruleBasedResult = await compareWithRules(candidateData, hrVerifiedData, clientRules);
+function calculateStringSimilarity(str1, str2) {
+  const longer = str1.length > str2.length ? str1 : str2;
+  const shorter = str1.length > str2.length ? str2 : str1;
 
-    // Then, get Gemini AI analysis for detailed insights
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
+  if (longer.length === 0) return 1.0;
 
-    const prompt = `
-You are a forensic analyst comparing employment verification data.
-
-**CANDIDATE CLAIMS:**
-${JSON.stringify(candidateData, null, 2)}
-
-**HR VERIFIED DATA:**
-${JSON.stringify(hrVerifiedData, null, 2)}
-
-Analyze the discrepancies and provide detailed insights. Return JSON:
-{
-  "overallRisk": "LOW" | "MEDIUM" | "HIGH",
-  "discrepancies": [
-    {
-      "field": "salary",
-      "claimed": "80000",
-      "verified": "60000",
-      "severity": "HIGH",
-      "analysis": "Candidate inflated salary by 33%"
-    }
-  ],
-  "recommendation": "PROCEED" | "INVESTIGATE" | "REJECT",
-  "summary": "Brief overall assessment"
+  const editDistance = levenshteinDistance(longer, shorter);
+  return (longer.length - editDistance) / longer.length;
 }
-`;
 
-    const result = await model.generateContent(prompt);
-    const response = result.response.text();
+function levenshteinDistance(str1, str2) {
+  const matrix = [];
 
-    // Clean JSON response
-    const cleanJson = response.replace(/```json/g, '').replace(/```/g, '').trim();
-    const geminiAnalysis = JSON.parse(cleanJson);
+  for (let i = 0; i <= str2.length; i++) {
+    matrix[i] = [i];
+  }
 
-    // Combine rule-based and AI analysis
+  for (let j = 0; j <= str1.length; j++) {
+    matrix[0][j] = j;
+  }
+
+  for (let i = 1; i <= str2.length; i++) {
+    for (let j = 1; j <= str1.length; j++) {
+      if (str2.charAt(i - 1) === str1.charAt(j - 1)) {
+        matrix[i][j] = matrix[i - 1][j - 1];
+      } else {
+        matrix[i][j] = Math.min(
+          matrix[i - 1][j - 1] + 1,
+          matrix[i][j - 1] + 1,
+          matrix[i - 1][j] + 1
+        );
+      }
+    }
+  }
+
+  return matrix[str2.length][str1.length];
+}
+
+/**
+ * Use Gemini AI to analyze discrepancies
+ */
+async function analyzeDiscrepanciesWithAI(employeeData, hrData, discrepancies) {
+  if (discrepancies.length === 0) {
     return {
-      riskScore: ruleBasedResult.riskScore,
-      zone: ruleBasedResult.zone,
-      overallRisk: geminiAnalysis.overallRisk || ruleBasedResult.zone,
-      discrepancies: ruleBasedResult.discrepancies,
-      matches: ruleBasedResult.matches,
-      matchRate: ruleBasedResult.matchRate,
-      recommendation: geminiAnalysis.recommendation,
-      summary: geminiAnalysis.summary,
-      aiInsights: geminiAnalysis.discrepancies,
-      comparedAt: new Date().toISOString()
+      reasoning: 'No discrepancies found. All data matches perfectly.',
+      riskLevel: 'LOW',
+      recommendations: ['Approve verification'],
+      confidence: 1.0
+    };
+  }
+
+  try {
+    const prompt = `You are an expert background verification analyst. Analyze the following discrepancies between employee-submitted data and HR-verified data.
+
+Employee Data:
+${JSON.stringify(employeeData, null, 2)}
+
+HR-Verified Data:
+${JSON.stringify(hrData, null, 2)}
+
+Discrepancies Found:
+${JSON.stringify(discrepancies, null, 2)}
+
+Please analyze:
+1. Are these discrepancies significant or minor?
+2. Could they be explained by normal variations (e.g., rounding, abbreviations)?
+3. Do they indicate potential fraud or just data entry errors?
+4. What is the overall risk level: LOW, MEDIUM, or HIGH?
+5. Should this verification be auto-approved (GREEN) or require manual review (RED)?
+
+Provide your analysis in JSON format:
+{
+  "reasoning": "detailed explanation",
+  "riskLevel": "LOW|MEDIUM|HIGH",
+  "recommendations": ["list of recommendations"],
+  "confidence": 0.0-1.0,
+  "suggestedZone": "GREEN|RED"
+}`;
+
+    const result = await client.models.generateContent({
+      model: MODEL_NAME,
+      contents: [prompt]
+    });
+    const response = result.text;
+
+    // Extract JSON from response
+    const jsonMatch = response.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      return JSON.parse(jsonMatch[0]);
+    }
+
+    // Fallback if AI doesn't return proper JSON
+    return {
+      reasoning: response,
+      riskLevel: discrepancies.some(d => d.severity === 'HIGH') ? 'HIGH' : 'MEDIUM',
+      recommendations: ['Manual review recommended'],
+      confidence: 0.7,
+      suggestedZone: 'RED'
     };
 
   } catch (error) {
-    console.error('Comparison Error:', error);
-
-    // Fallback to rule-based only if Gemini fails
-    const ruleBasedResult = await compareWithRules(candidateData, hrVerifiedData, clientRules);
+    console.error('AI analysis error:', error);
+    // Fallback to rule-based analysis
     return {
-      ...ruleBasedResult,
-      overallRisk: ruleBasedResult.zone,
-      recommendation: ruleBasedResult.zone === 'GREEN' ? 'PROCEED' : 'INVESTIGATE',
-      summary: `${ruleBasedResult.discrepancies.length} discrepancies found. Risk score: ${ruleBasedResult.riskScore}/100`,
-      comparedAt: new Date().toISOString()
+      reasoning: 'AI analysis unavailable. Using rule-based assessment.',
+      riskLevel: discrepancies.some(d => d.severity === 'HIGH') ? 'HIGH' : 'MEDIUM',
+      recommendations: ['Manual review recommended due to AI unavailability'],
+      confidence: 0.5,
+      suggestedZone: 'RED'
     };
   }
 }
 
-module.exports = { compareData, DEFAULT_CLIENT_RULES };
+/**
+ * Evaluate discrepancies against client-specific rules
+ */
+function evaluateClientRules(discrepancies, clientRules, aiAnalysis) {
+  const evaluation = {
+    rulesApplied: [],
+    rulesPassed: [],
+    rulesFailed: [],
+    clientSKU: clientRules?.sku || 'STANDARD'
+  };
 
+  // Default rules based on client SKU
+  const skuRules = {
+    BASIC: {
+      maxDiscrepancies: 3,
+      allowedSeverity: ['LOW', 'MEDIUM'],
+      criticalFields: ['employeeName']
+    },
+    STANDARD: {
+      maxDiscrepancies: 2,
+      allowedSeverity: ['LOW'],
+      criticalFields: ['employeeName', 'designation']
+    },
+    PREMIUM: {
+      maxDiscrepancies: 1,
+      allowedSeverity: ['LOW'],
+      criticalFields: ['employeeName', 'designation', 'employmentDates']
+    },
+    ENTERPRISE: {
+      maxDiscrepancies: 0,
+      allowedSeverity: [],
+      criticalFields: ['employeeName', 'designation', 'employmentDates', 'salary']
+    }
+  };
+
+  const rules = skuRules[evaluation.clientSKU] || skuRules.STANDARD;
+
+  // Rule 1: Maximum discrepancies
+  const rule1 = {
+    name: 'Maximum Discrepancies',
+    description: `Client allows maximum ${rules.maxDiscrepancies} discrepancies`,
+    passed: discrepancies.length <= rules.maxDiscrepancies,
+    actual: discrepancies.length,
+    expected: `<= ${rules.maxDiscrepancies}`
+  };
+  evaluation.rulesApplied.push(rule1);
+  if (rule1.passed) evaluation.rulesPassed.push(rule1.name);
+  else evaluation.rulesFailed.push(rule1.name);
+
+  // Rule 2: Severity check
+  const highSeverityCount = discrepancies.filter(d => d.severity === 'HIGH').length;
+  const rule2 = {
+    name: 'Severity Tolerance',
+    description: `High severity discrepancies not allowed for ${evaluation.clientSKU} tier`,
+    passed: highSeverityCount === 0 || rules.allowedSeverity.includes('HIGH'),
+    actual: `${highSeverityCount} high severity`,
+    expected: 'No high severity discrepancies'
+  };
+  evaluation.rulesApplied.push(rule2);
+  if (rule2.passed) evaluation.rulesPassed.push(rule2.name);
+  else evaluation.rulesFailed.push(rule2.name);
+
+  // Rule 3: Critical fields must match
+  const criticalFieldDiscrepancies = discrepancies.filter(d =>
+    rules.criticalFields.includes(d.fieldKey)
+  );
+  const rule3 = {
+    name: 'Critical Fields Match',
+    description: `Critical fields (${rules.criticalFields.join(', ')}) must match exactly`,
+    passed: criticalFieldDiscrepancies.length === 0,
+    actual: criticalFieldDiscrepancies.map(d => d.field).join(', ') || 'All match',
+    expected: 'All critical fields match'
+  };
+  evaluation.rulesApplied.push(rule3);
+  if (rule3.passed) evaluation.rulesPassed.push(rule3.name);
+  else evaluation.rulesFailed.push(rule3.name);
+
+  return evaluation;
+}
+
+/**
+ * Calculate overall risk score (0-100)
+ */
+function calculateRiskScore(discrepancies, aiAnalysis, ruleEvaluation) {
+  let score = 0;
+
+  // Base score from discrepancy count (0-30 points)
+  score += Math.min(discrepancies.length * 10, 30);
+
+  // Severity-based scoring (0-30 points)
+  const severityScores = { LOW: 5, MEDIUM: 10, HIGH: 20 };
+  const severityScore = discrepancies.reduce((sum, d) => sum + severityScores[d.severity], 0);
+  score += Math.min(severityScore, 30);
+
+  // AI risk level (0-20 points)
+  const aiRiskScores = { LOW: 0, MEDIUM: 10, HIGH: 20 };
+  score += aiRiskScores[aiAnalysis.riskLevel] || 10;
+
+  // Failed rules (0-20 points)
+  score += Math.min(ruleEvaluation.rulesFailed.length * 10, 20);
+
+  return Math.min(score, 100);
+}
+
+/**
+ * Assign zone based on risk score and rules
+ */
+function assignZone(riskScore, discrepancies, ruleEvaluation, clientRules) {
+  // Auto-assign to RED if any critical rules failed
+  if (ruleEvaluation.rulesFailed.length > 0) {
+    return 'RED';
+  }
+
+  // Use risk score thresholds
+  const threshold = clientRules?.riskThreshold || 30;
+
+  if (riskScore <= threshold && discrepancies.length === 0) {
+    return 'GREEN';
+  } else if (riskScore <= threshold) {
+    return 'GREEN'; // Low risk, minor discrepancies
+  } else {
+    return 'RED'; // High risk, needs manual review
+  }
+}
+
+/**
+ * Generate human-readable summary
+ */
+function generateSummary(zone, riskScore, discrepancies, aiAnalysis) {
+  if (zone === 'GREEN') {
+    return {
+      status: 'APPROVED',
+      message: 'Verification passed all checks. Data matches with acceptable tolerance.',
+      details: `Risk Score: ${riskScore}/100. ${discrepancies.length} minor discrepancies found.`,
+      action: 'Auto-approved for processing'
+    };
+  } else {
+    return {
+      status: 'NEEDS_REVIEW',
+      message: 'Verification flagged for manual review due to discrepancies or rule violations.',
+      details: `Risk Score: ${riskScore}/100. ${discrepancies.length} discrepancies found.`,
+      action: 'Requires supervisor review'
+    };
+  }
+}
+
+module.exports = {
+  compareVerificationData,
+  identifyDiscrepancies,
+  analyzeDiscrepanciesWithAI,
+  evaluateClientRules,
+  calculateRiskScore,
+  assignZone
+};

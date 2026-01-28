@@ -19,6 +19,27 @@ const SPECIAL_INSTRUCTIONS = [
     { id: 'red_checks_escalate', label: 'All RED checks (negative response) escalate to CSE' }
 ];
 
+interface FormErrors {
+    companyName?: string;
+    contactPerson?: string;
+    email?: string;
+    phone?: string;
+    totalEmployees?: string;
+    skuName?: string;
+}
+
+// Validation helper functions
+const isValidEmail = (email: string): boolean => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+};
+
+const isValidPhone = (phone: string): boolean => {
+    if (!phone) return true; // Optional field
+    const phoneDigits = phone.replace(/\D/g, '');
+    return phoneDigits.length >= 10;
+};
+
 const AddClient = () => {
     const navigate = useNavigate();
     const [loading, setLoading] = useState(false);
@@ -37,11 +58,80 @@ const AddClient = () => {
         specialInstructions: [] as string[]
     });
 
+    const [errors, setErrors] = useState<FormErrors>({});
+
+    // Validate a single field
+    const validateField = (name: string, value: string | number): string | undefined => {
+        switch (name) {
+            case 'companyName':
+                if (!String(value).trim()) return 'Company name is required';
+                if (String(value).trim().length < 2) return 'Company name must be at least 2 characters';
+                return undefined;
+            case 'contactPerson':
+                if (!String(value).trim()) return 'Contact person is required';
+                if (String(value).trim().length < 2) return 'Contact person must be at least 2 characters';
+                return undefined;
+            case 'email':
+                if (!String(value).trim()) return 'Email is required';
+                if (!isValidEmail(String(value))) return 'Please enter a valid email address';
+                return undefined;
+            case 'phone':
+                if (String(value) && !isValidPhone(String(value))) return 'Please enter a valid phone number (10+ digits)';
+                return undefined;
+            case 'totalEmployees':
+                if (!value || Number(value) < 1) return 'At least 1 employee is required';
+                return undefined;
+            case 'skuName':
+                if (!String(value).trim()) return 'SKU name is required';
+                return undefined;
+            default:
+                return undefined;
+        }
+    };
+
+    // Validate entire form
+    const validateForm = (): boolean => {
+        const newErrors: FormErrors = {};
+        let isValid = true;
+
+        newErrors.companyName = validateField('companyName', formData.companyName);
+        newErrors.contactPerson = validateField('contactPerson', formData.contactPerson);
+        newErrors.email = validateField('email', formData.email);
+        newErrors.phone = validateField('phone', formData.phone);
+        newErrors.totalEmployees = validateField('totalEmployees', formData.totalEmployees);
+        newErrors.skuName = validateField('skuName', formData.skuName);
+
+        // Check if any errors exist
+        Object.values(newErrors).forEach(error => {
+            if (error) isValid = false;
+        });
+
+        setErrors(newErrors);
+        return isValid;
+    };
+
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
         setFormData(prev => ({
             ...prev,
             [name]: name === 'totalEmployees' ? parseInt(value) || 0 : value
+        }));
+
+        // Clear error on change
+        if (errors[name as keyof FormErrors]) {
+            setErrors(prev => ({
+                ...prev,
+                [name]: undefined
+            }));
+        }
+    };
+
+    const handleBlur = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+        const { name, value } = e.target;
+        const error = validateField(name, name === 'totalEmployees' ? parseInt(value) || 0 : value);
+        setErrors(prev => ({
+            ...prev,
+            [name]: error
         }));
     };
 
@@ -56,6 +146,12 @@ const AddClient = () => {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+
+        // Validate form before submission
+        if (!validateForm()) {
+            return;
+        }
+
         setLoading(true);
 
         try {
@@ -70,6 +166,14 @@ const AddClient = () => {
         } finally {
             setLoading(false);
         }
+    };
+
+    // Helper to get input class based on error state
+    const getInputClass = (hasError: boolean) => {
+        const base = 'w-full px-4 py-2 border rounded-lg focus:ring-2 focus:border-transparent';
+        return hasError
+            ? `${base} border-red-500 focus:ring-red-500`
+            : `${base} border-slate-300 focus:ring-blue-500`;
     };
 
     return (
@@ -106,10 +210,13 @@ const AddClient = () => {
                                         name="companyName"
                                         value={formData.companyName}
                                         onChange={handleChange}
-                                        required
-                                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        onBlur={handleBlur}
+                                        className={getInputClass(!!errors.companyName)}
                                         placeholder="Acme Corporation"
                                     />
+                                    {errors.companyName && (
+                                        <p className="text-red-500 text-xs mt-1">{errors.companyName}</p>
+                                    )}
                                 </div>
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -123,10 +230,13 @@ const AddClient = () => {
                                             name="contactPerson"
                                             value={formData.contactPerson}
                                             onChange={handleChange}
-                                            required
-                                            className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                            onBlur={handleBlur}
+                                            className={getInputClass(!!errors.contactPerson)}
                                             placeholder="John Doe"
                                         />
+                                        {errors.contactPerson && (
+                                            <p className="text-red-500 text-xs mt-1">{errors.contactPerson}</p>
+                                        )}
                                     </div>
 
                                     {/* Email */}
@@ -139,10 +249,13 @@ const AddClient = () => {
                                             name="email"
                                             value={formData.email}
                                             onChange={handleChange}
-                                            required
-                                            className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                            onBlur={handleBlur}
+                                            className={getInputClass(!!errors.email)}
                                             placeholder="john.doe@acme.com"
                                         />
+                                        {errors.email && (
+                                            <p className="text-red-500 text-xs mt-1">{errors.email}</p>
+                                        )}
                                     </div>
 
                                     {/* Phone */}
@@ -155,9 +268,13 @@ const AddClient = () => {
                                             name="phone"
                                             value={formData.phone}
                                             onChange={handleChange}
-                                            className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                            onBlur={handleBlur}
+                                            className={getInputClass(!!errors.phone)}
                                             placeholder="+91-9876543210"
                                         />
+                                        {errors.phone && (
+                                            <p className="text-red-500 text-xs mt-1">{errors.phone}</p>
+                                        )}
                                     </div>
 
                                     {/* Total Employees */}
@@ -170,11 +287,14 @@ const AddClient = () => {
                                             name="totalEmployees"
                                             value={formData.totalEmployees}
                                             onChange={handleChange}
-                                            required
+                                            onBlur={handleBlur}
                                             min="1"
-                                            className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                            className={getInputClass(!!errors.totalEmployees)}
                                             placeholder="5"
                                         />
+                                        {errors.totalEmployees && (
+                                            <p className="text-red-500 text-xs mt-1">{errors.totalEmployees}</p>
+                                        )}
                                     </div>
                                 </div>
 
@@ -209,10 +329,13 @@ const AddClient = () => {
                                         name="skuName"
                                         value={formData.skuName}
                                         onChange={handleChange}
-                                        required
-                                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        onBlur={handleBlur}
+                                        className={getInputClass(!!errors.skuName)}
                                         placeholder="e.g., Standard Employment Verification"
                                     />
+                                    {errors.skuName && (
+                                        <p className="text-red-500 text-xs mt-1">{errors.skuName}</p>
+                                    )}
                                 </div>
 
                                 {/* Primary Verification Method */}
@@ -224,7 +347,6 @@ const AddClient = () => {
                                         name="primaryVerificationMethod"
                                         value={formData.primaryVerificationMethod}
                                         onChange={handleChange}
-                                        required
                                         className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                     >
                                         <option value="hr_rm_verification">HR/RM Verification (Email/Call)</option>
@@ -242,7 +364,6 @@ const AddClient = () => {
                                         name="fallbackMethod"
                                         value={formData.fallbackMethod}
                                         onChange={handleChange}
-                                        required
                                         className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                     >
                                         <option value="uan_verification">UAN Verification</option>
@@ -263,7 +384,6 @@ const AddClient = () => {
                                         name="verificationType"
                                         value={formData.verificationType}
                                         onChange={handleChange}
-                                        required
                                         className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                     >
                                         <option value="written">Written Verification</option>

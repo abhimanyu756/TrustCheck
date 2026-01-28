@@ -1,7 +1,8 @@
-const { GoogleGenerativeAI } = require("@google/generative-ai");
+const { GoogleGenAI } = require("@google/genai");
 require('dotenv').config();
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const client = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+const MODEL_NAME = "gemini-2.5-flash";
 
 /**
  * Main function to execute check based on type
@@ -66,9 +67,11 @@ Return JSON format:
 For this simulation, assume the education is verified with LOW_RISK (score: 15).
 `;
 
-        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
-        const result = await model.generateContent(prompt);
-        const responseText = result.response.text();
+        const result = await client.models.generateContent({
+            model: MODEL_NAME,
+            contents: [prompt]
+        });
+        const responseText = result.text;
 
         // Parse JSON response
         const jsonMatch = responseText.match(/\{[\s\S]*\}/);
@@ -125,9 +128,11 @@ Return JSON format:
 For this simulation, assume no criminal records found with LOW_RISK (score: 5).
 `;
 
-        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
-        const result = await model.generateContent(prompt);
-        const responseText = result.response.text();
+        const result = await client.models.generateContent({
+            model: MODEL_NAME,
+            contents: [prompt]
+        });
+        const responseText = result.text;
 
         // Parse JSON response
         const jsonMatch = responseText.match(/\{[\s\S]*\}/);
@@ -157,15 +162,38 @@ async function executeEmploymentCheck(check) {
         // Import existing services
         const { createVerificationSheet, getSheetResponses, hasHRResponded } = require('./googleSheetsService');
         const { sendVerificationEmail } = require('./emailService');
-        const { compareData } = require('./comparisonService');
+        const { compareVerificationData } = require('./comparisonService');
+        const { getDocumentsByCheck } = require('./database');
+
+        // Fetch documents and check for extracted data
+        const documents = await getDocumentsByCheck(check.checkId);
+        let extractedData = {};
+
+        // Merge data from all documents (later uploads overwrite earlier ones)
+        if (documents && documents.length > 0) {
+            console.log(`📄 Found ${documents.length} documents for this check.`);
+            documents.forEach(doc => {
+                if (doc.extractedData) { // Note: getDocumentsByCheck needs to ensure this field is returned from metadata
+                    try {
+                        const data = typeof doc.extractedData === 'string' ? JSON.parse(doc.extractedData) : doc.extractedData;
+                        extractedData = { ...extractedData, ...data };
+                    } catch (e) { console.error('Error parsing extracted data', e); }
+                }
+            });
+        }
+
+        if (Object.keys(extractedData).length > 0) {
+            console.log('✨ Using extracted document data for verification request');
+        }
 
         // Prepare candidate data for this specific employment
         const candidateData = {
-            employeeName: check.employeeName || 'Employee',
-            companyName: check.companyName,
-            designation: check.designation,
-            employmentDates: check.employmentDates,
-            hrEmail: check.hrEmail
+            employeeName: extractedData.employeeName || check.employeeName || 'Employee',
+            companyName: extractedData.companyName || check.companyName,
+            designation: extractedData.designation || check.designation,
+            employmentDates: extractedData.employmentDates || check.employmentDates,
+            salary: extractedData.salary || check.salary || '', // Add salary if extracted
+            hrEmail: check.hrEmail // HR email usually comes from the check request itself, not the document
         };
 
         // Create unique request ID for this employment check
@@ -197,7 +225,7 @@ async function executeEmploymentCheck(check) {
             if (hrResponded) {
                 // HR has responded - fetch and compare data
                 const hrResponses = await getSheetResponses(sheetData.spreadsheetId);
-                const comparisonResult = await compareData(candidateData, hrResponses);
+                const comparisonResult = await compareVerificationData(check.checkId, candidateData, hrResponses, null);
 
                 // Log HR response activity
                 const { logActivity } = require('./database');
@@ -281,9 +309,11 @@ Return JSON format:
 For this simulation, assume employment is verified with LOW_RISK (score: 20).
 `;
 
-            const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
-            const result = await model.generateContent(prompt);
-            const responseText = result.response.text();
+            const result = await client.models.generateContent({
+                model: MODEL_NAME,
+                contents: [prompt]
+            });
+            const responseText = result.text;
 
             // Parse JSON response
             const jsonMatch = responseText.match(/\{[\s\S]*\}/);

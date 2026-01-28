@@ -22,6 +22,7 @@ const checkRoutes = require('./routes/checkRoutes');
 const documentUploadRoutes = require('./routes/documentUploadRoutes');
 const activityLogRoutes = require('./routes/activityLogRoutes');
 const emailRoutes = require('./routes/emailRoutes');
+const zoneRoutes = require('./routes/zoneRoutes');
 
 app.use(cors());
 app.use(express.json());
@@ -41,6 +42,7 @@ app.use('/api/checks', checkRoutes);
 app.use('/api/document-upload', documentUploadRoutes);
 app.use('/api/activity-logs', activityLogRoutes);
 app.use('/api/emails', emailRoutes);
+app.use('/api/zones', zoneRoutes);
 
 // Initialize all services, then start server
 Promise.all([

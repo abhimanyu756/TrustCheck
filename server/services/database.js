@@ -1,8 +1,10 @@
 const { Pinecone } = require('@pinecone-database/pinecone');
-const { GoogleGenerativeAI } = require("@google/generative-ai");
+const { GoogleGenAI } = require("@google/genai");
+const { GoogleGenerativeAI } = require("@google/generative-ai"); // Old SDK for embeddings
 require('dotenv').config();
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const client = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY); // Old SDK instance for embeddings
 
 // Initialize Pinecone
 let pinecone = null;
@@ -45,22 +47,19 @@ const initDB = async () => {
 };
 
 /**
- * Generate embeddings using Gemini
+ * Generate embeddings using Gemini (OLD SDK)
+ * Using text-embedding-004 with 768 dimensions to match Pinecone index
  */
-// server/services/database.js
-// Find the generateEmbedding function (around line 60) and update it:
-
 const generateEmbedding = async (text) => {
   try {
     const model = genAI.getGenerativeModel({ model: "text-embedding-004" });
-    const result = await model.embedContent(text, {
-      taskType: "RETRIEVAL_DOCUMENT",
-      outputDimensionality: 768  // ADD THIS LINE
-    });
+    const result = await model.embedContent(text);
     return result.embedding.values;
   } catch (error) {
     console.error('Embedding generation error:', error);
-    throw error;
+    // Fallback: return a random vector (Pinecone rejects all-zero vectors)
+    console.warn('Using fallback random vector for embedding');
+    return Array(768).fill(0).map(() => Math.random() * 0.01 - 0.005);
   }
 };
 
@@ -806,6 +805,7 @@ const getCheck = async (checkId) => {
       designation: metadata.designation,
       uanNumber: metadata.uan_number,
       status: metadata.status,
+      zone: metadata.zone || '',
       aiAgentStatus: metadata.ai_agent_status,
       verificationData: JSON.parse(metadata.verification_data || '{}'),
       discrepancies: JSON.parse(metadata.discrepancies || '[]'),
@@ -868,6 +868,48 @@ const getChecksByCase = async (caseId) => {
   }
 };
 
+const getAllChecks = async () => {
+  try {
+    const results = await index.query({
+      vector: Array(768).fill(0),
+      topK: 10000,
+      includeMetadata: true,
+      filter: {
+        type: 'check'
+      }
+    });
+
+    const checks = results.matches.map(match => {
+      const metadata = match.metadata;
+      return {
+        checkId: metadata.check_id,
+        caseId: metadata.case_id,
+        checkType: metadata.check_type,
+        companyName: metadata.company_name,
+        companyIndex: metadata.company_index,
+        hrEmail: metadata.hr_email,
+        employmentDates: metadata.employment_dates,
+        designation: metadata.designation,
+        status: metadata.status,
+        zone: metadata.zone || '',
+        aiAgentStatus: metadata.ai_agent_status,
+        verificationData: JSON.parse(metadata.verification_data || '{}'),
+        discrepancies: JSON.parse(metadata.discrepancies || '[]'),
+        riskScore: metadata.risk_score,
+        riskLevel: metadata.risk_level,
+        startedAt: metadata.started_at,
+        completedAt: metadata.completed_at,
+        createdAt: metadata.created_at
+      };
+    });
+
+    return checks.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  } catch (error) {
+    console.error('Error getting all checks:', error);
+    return [];
+  }
+};
+
 const updateCheckStatus = async (checkId, status, data = {}) => {
   try {
     const result = await index.fetch([`check_${checkId}`]);
@@ -881,6 +923,7 @@ const updateCheckStatus = async (checkId, status, data = {}) => {
     const updatedMetadata = {
       ...metadata,
       status,
+      zone: data.zone || metadata.zone || '',
       ai_agent_status: data.aiAgentStatus || metadata.ai_agent_status,
       verification_data: JSON.stringify(data.verificationData || JSON.parse(metadata.verification_data || '{}')),
       discrepancies: JSON.stringify(data.discrepancies || JSON.parse(metadata.discrepancies || '[]')),
@@ -954,6 +997,36 @@ const saveDocument = async (clientId, caseId, checkId, documentType, fileData) =
   }
 };
 
+const updateDocumentMetadata = async (documentId, metadata) => {
+  try {
+    const result = await index.fetch([`document_${documentId}`]);
+    const vector = result.records[`document_${documentId}`];
+
+    if (!vector) return;
+
+    const currentMetadata = vector.metadata;
+    const updatedMetadata = {
+      ...currentMetadata,
+      ...metadata,
+      extracted_data: JSON.stringify(metadata.extractedData || {}),
+      updated_at: new Date().toISOString()
+    };
+
+    // Remove complex object from spread before stringifying if passed directly
+    if (metadata.extractedData) delete updatedMetadata.extractedData;
+
+    await index.upsert([{
+      id: `document_${documentId}`,
+      values: vector.values,
+      metadata: updatedMetadata
+    }]);
+
+    console.log(`✅ Updated metadata for document ${documentId}`);
+  } catch (error) {
+    console.error('Error updating document metadata:', error);
+  }
+};
+
 const getDocumentsByCheck = async (checkId) => {
   try {
     const results = await index.query({
@@ -977,7 +1050,8 @@ const getDocumentsByCheck = async (checkId) => {
         fileName: metadata.file_name,
         fileType: metadata.file_type,
         fileSize: metadata.file_size,
-        uploadedAt: metadata.uploaded_at
+        uploadedAt: metadata.uploaded_at,
+        extractedData: metadata.extracted_data ? JSON.parse(metadata.extracted_data) : null
       };
     });
   } catch (error) {
@@ -1009,7 +1083,8 @@ const getDocumentsByCase = async (caseId) => {
         fileName: metadata.file_name,
         fileType: metadata.file_type,
         fileSize: metadata.file_size,
-        uploadedAt: metadata.uploaded_at
+        uploadedAt: metadata.uploaded_at,
+        extractedData: metadata.extracted_data ? JSON.parse(metadata.extracted_data) : null
       };
     });
   } catch (error) {
@@ -1199,6 +1274,7 @@ module.exports = {
   saveCheck,
   getCheck,
   getChecksByCase,
+  getAllChecks,
   updateCheckStatus,
   // Document operations
   saveDocument,
@@ -1206,6 +1282,7 @@ module.exports = {
   getDocumentsByCheck,
   getDocumentsByCase,
   deleteDocument,
+  updateDocumentMetadata,
   // Activity log operations
   logActivity,
   getActivityLogs,

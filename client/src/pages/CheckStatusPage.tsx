@@ -184,9 +184,11 @@ const CheckStatusPage = () => {
     }
 
     const verificationData = check.verificationData || {};
-    const emailSent = verificationData.method === 'EMAIL_VERIFICATION';
-    const sheetCreated = verificationData.googleSheetsUrl ? true : false;
-    const hrResponded = verificationData.verified === true;
+    const emailSent = emails.length > 0 || verificationData.method === 'EMAIL_VERIFICATION';
+    // Check if any email has a Google Sheet URL
+    const sheetCreated = emails.some(email => email.googleSheetsUrl) || verificationData.googleSheetsUrl ? true : false;
+    // Check if we have any HR responses
+    const hrResponded = emailResponses.length > 0 || verificationData.verified === true;
 
     return (
         <div className="min-h-screen bg-slate-50 py-8 px-4">
@@ -440,10 +442,82 @@ const CheckStatusPage = () => {
                     {Object.keys(verificationData).length > 0 && (
                         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
                             <h3 className="text-xl font-semibold text-slate-800 mb-4">Verification Data</h3>
-                            <div className="bg-slate-50 rounded-lg p-4">
-                                <pre className="text-xs text-slate-700 overflow-auto">
-                                    {JSON.stringify(verificationData, null, 2)}
-                                </pre>
+                            <div className="overflow-hidden rounded-lg border border-slate-200">
+                                <table className="min-w-full divide-y divide-slate-200">
+                                    <tbody className="divide-y divide-slate-100">
+                                        {verificationData.companyName && (
+                                            <tr>
+                                                <td className="px-4 py-3 text-sm font-medium text-slate-600 bg-slate-50 w-48">Company</td>
+                                                <td className="px-4 py-3 text-sm text-slate-800">{verificationData.companyName}</td>
+                                            </tr>
+                                        )}
+                                        {verificationData.designation && (
+                                            <tr>
+                                                <td className="px-4 py-3 text-sm font-medium text-slate-600 bg-slate-50 w-48">Designation</td>
+                                                <td className="px-4 py-3 text-sm text-slate-800">{verificationData.designation}</td>
+                                            </tr>
+                                        )}
+                                        {verificationData.employmentDates && (
+                                            <tr>
+                                                <td className="px-4 py-3 text-sm font-medium text-slate-600 bg-slate-50 w-48">Employment Period</td>
+                                                <td className="px-4 py-3 text-sm text-slate-800">{verificationData.employmentDates}</td>
+                                            </tr>
+                                        )}
+                                        {verificationData.hrEmail && (
+                                            <tr>
+                                                <td className="px-4 py-3 text-sm font-medium text-slate-600 bg-slate-50 w-48">HR Contact</td>
+                                                <td className="px-4 py-3 text-sm text-slate-800">{verificationData.hrEmail}</td>
+                                            </tr>
+                                        )}
+                                        {verificationData.status && (
+                                            <tr>
+                                                <td className="px-4 py-3 text-sm font-medium text-slate-600 bg-slate-50 w-48">Status</td>
+                                                <td className="px-4 py-3 text-sm text-slate-800">
+                                                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${verificationData.status === 'VERIFIED' || verificationData.status === 'COMPLETED'
+                                                        ? 'bg-green-100 text-green-700'
+                                                        : verificationData.status === 'PENDING_HR_RESPONSE' || verificationData.status === 'IN_PROGRESS'
+                                                            ? 'bg-yellow-100 text-yellow-700'
+                                                            : 'bg-slate-100 text-slate-700'
+                                                        }`}>
+                                                        {verificationData.status.replace(/_/g, ' ')}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        )}
+                                        {verificationData.method && (
+                                            <tr>
+                                                <td className="px-4 py-3 text-sm font-medium text-slate-600 bg-slate-50 w-48">Method</td>
+                                                <td className="px-4 py-3 text-sm text-slate-800">{verificationData.method.replace(/_/g, ' ')}</td>
+                                            </tr>
+                                        )}
+                                        {typeof verificationData.verified === 'boolean' && (
+                                            <tr>
+                                                <td className="px-4 py-3 text-sm font-medium text-slate-600 bg-slate-50 w-48">Verified</td>
+                                                <td className="px-4 py-3 text-sm">
+                                                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${verificationData.verified ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                                                        }`}>
+                                                        {verificationData.verified ? '✓ Yes' : '✗ No'}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        )}
+                                        {verificationData.googleSheetsUrl && (
+                                            <tr>
+                                                <td className="px-4 py-3 text-sm font-medium text-slate-600 bg-slate-50 w-48">Verification Form</td>
+                                                <td className="px-4 py-3 text-sm">
+                                                    <a
+                                                        href={verificationData.googleSheetsUrl}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="text-blue-600 hover:text-blue-800 hover:underline"
+                                                    >
+                                                        Open Google Sheet ↗
+                                                    </a>
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
                             </div>
                         </div>
                     )}
@@ -481,15 +555,42 @@ const CheckStatusPage = () => {
                                                     {log.action.replace(/_/g, ' ')}
                                                 </p>
                                                 <p className="text-sm text-slate-600 mt-1">{log.description}</p>
-                                                {log.metadata && Object.keys(log.metadata).length > 0 && (
-                                                    <div className="mt-2 text-xs text-slate-500">
-                                                        {Object.entries(log.metadata).map(([key, value]) => (
-                                                            <span key={key} className="mr-3">
-                                                                <span className="font-medium">{key}:</span> {String(value)}
-                                                            </span>
-                                                        ))}
-                                                    </div>
-                                                )}
+                                                {(() => {
+                                                    // Parse metadata if it's a string
+                                                    let parsedMetadata = log.metadata;
+                                                    if (typeof parsedMetadata === 'string') {
+                                                        try {
+                                                            parsedMetadata = JSON.parse(parsedMetadata);
+                                                        } catch {
+                                                            return null; // Skip if can't parse
+                                                        }
+                                                    }
+
+                                                    if (!parsedMetadata || typeof parsedMetadata !== 'object') return null;
+
+                                                    // Only show these specific fields
+                                                    const displayableFields = ['fileName', 'documentType', 'fileSize', 'riskScore', 'zone', 'status'];
+                                                    const filteredEntries = Object.entries(parsedMetadata)
+                                                        .filter(([key, value]) => {
+                                                            // Only show allowed fields with short values
+                                                            if (!displayableFields.includes(key)) return false;
+                                                            if (typeof value === 'string' && value.length > 80) return false;
+                                                            if (typeof value === 'object') return false;
+                                                            return true;
+                                                        });
+
+                                                    if (filteredEntries.length === 0) return null;
+
+                                                    return (
+                                                        <div className="mt-2 text-xs text-slate-500">
+                                                            {filteredEntries.map(([key, value]) => (
+                                                                <span key={key} className="mr-3">
+                                                                    <span className="font-medium">{key}:</span> {String(value)}
+                                                                </span>
+                                                            ))}
+                                                        </div>
+                                                    );
+                                                })()}
                                             </div>
                                             <span className="text-xs text-slate-500 whitespace-nowrap ml-4">
                                                 {new Date(log.timestamp).toLocaleString()}
@@ -504,28 +605,36 @@ const CheckStatusPage = () => {
                     {/* Actions */}
                     <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
                         <h3 className="text-xl font-semibold text-slate-800 mb-4">Actions</h3>
-                        <div className="flex gap-3">
+                        <div className="flex gap-3 flex-wrap">
                             {check.status === 'PENDING' && (
                                 <button
+                                    type="button"
                                     onClick={() => {
                                         axios.post(`http://localhost:3000/api/checks/${checkId}/execute`)
                                             .then(() => {
                                                 alert('Check executed!');
                                                 fetchCheckDetails();
                                             })
-                                            .catch(err => alert('Failed to execute check'));
+                                            .catch(() => alert('Failed to execute check'));
                                     }}
-                                    className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                                    className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium cursor-pointer"
                                 >
                                     Execute Check
                                 </button>
                             )}
                             <button
-                                onClick={fetchCheckDetails}
-                                className="px-6 py-3 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors font-medium"
+                                type="button"
+                                onClick={() => fetchCheckDetails()}
+                                className="px-6 py-3 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors font-medium cursor-pointer active:bg-slate-100"
                             >
                                 🔄 Refresh Status
                             </button>
+                            <Link
+                                to={`/cases/${check.caseId}/extracted-data`}
+                                className="px-6 py-3 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors font-medium"
+                            >
+                                📄 View Extracted Data
+                            </Link>
                         </div>
                     </div>
                 </div>

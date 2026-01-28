@@ -1,4 +1,4 @@
-const { GoogleGenerativeAI } = require("@google/generative-ai");
+const { GoogleGenAI } = require("@google/genai");
 const { compareData } = require('./comparisonService');
 const { analyzeSentiment } = require('./forensicsService');
 const {
@@ -12,7 +12,8 @@ const {
 } = require('./database');
 require('dotenv').config();
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const client = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+const MODEL_NAME = "gemini-2.5-flash";
 
 async function createVerificationRequest(data) {
     const id = Math.random().toString(36).substring(7);
@@ -52,9 +53,11 @@ If field not mentioned, omit it. Return only JSON.
 `;
 
     try {
-        const extractModel = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
-        const extractResult = await extractModel.generateContent(extractionPrompt);
-        const extractedJson = extractResult.response.text().replace(/```json/g, '').replace(/```/g, '').trim();
+        const extractResult = await client.models.generateContent({
+            model: MODEL_NAME,
+            contents: [extractionPrompt]
+        });
+        const extractedJson = extractResult.text.replace(/```json/g, '').replace(/```/g, '').trim();
         const extractedData = JSON.parse(extractedJson);
 
         // Merge and save extracted data
@@ -84,9 +87,11 @@ If field not mentioned, omit it. Return only JSON.
     user: ${userMessage}
   `;
 
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
-    const result = await model.generateContent(context);
-    const response = result.response.text();
+    const result = await client.models.generateContent({
+        model: MODEL_NAME,
+        contents: [context]
+    });
+    const response = result.text;
 
     // Save AI response to database
     await saveChatMessage(requestId, 'model', response);

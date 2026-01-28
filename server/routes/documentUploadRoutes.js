@@ -43,6 +43,28 @@ router.post('/upload', upload.single('document'), async (req, res) => {
 
         const result = await saveDocument(clientId, caseId, checkId, documentType, fileData);
 
+        // Process extraction in background (or await if fast enough - 1.5 Flash is fast)
+        // We'll await it to provide immediate feedback in logs/DB
+        try {
+            const { extractDocumentData } = require('../services/geminiService');
+            const { updateDocumentMetadata } = require('../services/database');
+
+            console.log(`🔍 Extracting data from document ${result.documentId}...`);
+            const extractedData = await extractDocumentData(fileData.fileBuffer, fileData.fileType);
+
+            if (extractedData) {
+                console.log('✅ Extraction successful:', extractedData.employeeName);
+                await updateDocumentMetadata(result.documentId, {
+                    extractedData: extractedData
+                });
+            } else {
+                console.log('⚠️ No data extracted from document');
+            }
+        } catch (extractionError) {
+            console.error('Extraction failed:', extractionError);
+            // Don't fail the upload just because extraction failed
+        }
+
         // Log activity
         await logActivity(
             'check',
