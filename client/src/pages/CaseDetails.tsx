@@ -38,7 +38,7 @@ const CaseDetails = () => {
 
     const fetchCaseDetails = async () => {
         try {
-            const response = await axios.get(`http://localhost:3000/api/cases/${caseId}`);
+            const response = await axios.get(`/api/cases/${caseId}`);
             setCaseData(response.data);
         } catch (error) {
             console.error('Error fetching case details:', error);
@@ -50,7 +50,7 @@ const CaseDetails = () => {
     const executeAllChecks = async () => {
         setExecuting(true);
         try {
-            await axios.post(`http://localhost:3000/api/cases/${caseId}/execute`);
+            await axios.post(`/api/cases/${caseId}/execute`);
             alert('All checks executed successfully!');
             fetchCaseDetails(); // Refresh data
         } catch (error) {

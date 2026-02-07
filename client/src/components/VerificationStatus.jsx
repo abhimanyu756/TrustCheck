@@ -18,7 +18,7 @@ const VerificationStatus = ({ requestId }) => {
 
     const fetchStatus = async () => {
         try {
-            const response = await axios.get(`http://localhost:3000/api/verify/${requestId}/status`);
+            const response = await axios.get(`/api/verify/${requestId}/status`);
             setStatus(response.data);
             setLoading(false);
         } catch (err) {
@@ -30,7 +30,7 @@ const VerificationStatus = ({ requestId }) => {
     const handleManualFetch = async () => {
         try {
             setLoading(true);
-            const response = await axios.post(`http://localhost:3000/api/verify/${requestId}/fetch-and-compare`);
+            const response = await axios.post(`/api/verify/${requestId}/fetch-and-compare`);
             if (response.data.success) {
                 await fetchStatus();
                 alert('Verification completed successfully!');

@@ -7,6 +7,7 @@ import Breadcrumb from '../components/Breadcrumb';
 interface PreviousEmployment {
     companyName: string;
     hrEmail: string;
+    hrPhone: string;
     employmentDates: string;
     designation: string;
     uanNumber: string;
@@ -69,6 +70,7 @@ const AddEmployees = () => {
         previousEmployments: [{
             companyName: '',
             hrEmail: '',
+            hrPhone: '',
             employmentDates: '',
             designation: '',
             uanNumber: ''
@@ -182,6 +184,7 @@ const AddEmployees = () => {
             previousEmployments: [{
                 companyName: '',
                 hrEmail: '',
+                hrPhone: '',
                 employmentDates: '',
                 designation: '',
                 uanNumber: ''
@@ -200,6 +203,7 @@ const AddEmployees = () => {
         updated[empIndex].previousEmployments.push({
             companyName: '',
             hrEmail: '',
+            hrPhone: '',
             employmentDates: '',
             designation: '',
             uanNumber: ''
@@ -288,7 +292,7 @@ const AddEmployees = () => {
         try {
             // Create cases for all employees
             const promises = employees.map(emp =>
-                axios.post('http://localhost:3000/api/cases', {
+                axios.post('/api/cases', {
                     clientId,
                     employeeData: {
                         employeeName: emp.employeeName,
@@ -493,6 +497,17 @@ const AddEmployees = () => {
                                                         {errors[empIndex]?.employments?.[compIndex]?.hrEmail && (
                                                             <p className="text-red-500 text-xs mt-1">{errors[empIndex].employments[compIndex].hrEmail}</p>
                                                         )}
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-xs font-medium text-slate-600 mb-1">HR Phone</label>
+                                                        <input
+                                                            type="tel"
+                                                            value={employment.hrPhone}
+                                                            onChange={(e) => handleEmploymentChange(empIndex, compIndex, 'hrPhone', e.target.value)}
+                                                            onBlur={(e) => handleEmploymentBlur(empIndex, compIndex, 'hrPhone', e.target.value)}
+                                                            className={getSmallInputClass(false)}
+                                                            placeholder="+91-9876543210"
+                                                        />
                                                     </div>
                                                     <div>
                                                         <label className="block text-xs font-medium text-slate-600 mb-1">Employment Dates *</label>

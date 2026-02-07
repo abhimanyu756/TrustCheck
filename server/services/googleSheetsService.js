@@ -292,9 +292,296 @@ const hasHRResponded = async (spreadsheetId) => {
     }
 };
 
+/**
+ * Create an education verification sheet for university registrar
+ */
+const createEducationVerificationSheet = async (studentData, requestId) => {
+    try {
+        // Mock mode if not configured
+        if (!sheets) {
+            console.log('📝 MOCK: Creating Education Verification Sheet for', studentData.studentName);
+            return {
+                spreadsheetId: `mock_edu_sheet_${requestId}`,
+                spreadsheetUrl: `https://docs.google.com/spreadsheets/d/mock_edu_${requestId}`,
+                isMock: true
+            };
+        }
+
+        // Create new spreadsheet
+        const createResponse = await sheets.spreadsheets.create({
+            requestBody: {
+                properties: {
+                    title: `TrustCheck Education Verification - ${studentData.studentName} - ${requestId}`,
+                },
+                sheets: [{
+                    properties: {
+                        title: 'Education Verification Form',
+                        gridProperties: {
+                            frozenRowCount: 1,
+                        }
+                    }
+                }]
+            },
+        });
+
+        const spreadsheetId = createResponse.data.spreadsheetId;
+        const sheetId = createResponse.data.sheets[0].properties.sheetId;
+
+        // Prepare education verification data
+        const values = [
+            ['Verification Field', 'Submitted Value', 'Verified Value', 'Comments'],
+            ['Student Name', studentData.studentName || 'N/A', '', ''],
+            ['Enrollment/Roll Number', studentData.enrollmentNumber || 'N/A', '', ''],
+            ['Degree/Qualification', studentData.degree || 'N/A', '', ''],
+            ['Specialization/Branch', studentData.specialization || 'N/A', '', ''],
+            ['College/Institution Name', studentData.institution || 'N/A', '', ''],
+            ['University Name', studentData.university || 'N/A', '', ''],
+            ['Year of Passing', studentData.yearOfPassing || 'N/A', '', ''],
+            ['Final Grade/CGPA/Percentage', 'N/A', '', ''],
+            ['Was the student enrolled at this institution?', 'N/A', '', 'Yes/No'],
+            ['Did the student complete the degree program?', 'N/A', '', 'Yes/No'],
+            ['Is the certificate/degree authentic?', 'N/A', '', 'Yes/No'],
+            ['Any disciplinary issues during enrollment?', 'N/A', '', ''],
+            ['Additional Remarks', 'N/A', '', ''],
+            ['Verified By (Name & Designation)', 'N/A', '', ''],
+            ['Verification Date', 'N/A', '', ''],
+        ];
+
+        // Update sheet with data
+        await sheets.spreadsheets.values.update({
+            spreadsheetId,
+            range: 'Education Verification Form!A1:D16',
+            valueInputOption: 'RAW',
+            requestBody: { values },
+        });
+
+        // Format the sheet
+        await sheets.spreadsheets.batchUpdate({
+            spreadsheetId,
+            requestBody: {
+                requests: [
+                    // Header row formatting
+                    {
+                        repeatCell: {
+                            range: {
+                                sheetId: sheetId,
+                                startRowIndex: 0,
+                                endRowIndex: 1,
+                            },
+                            cell: {
+                                userEnteredFormat: {
+                                    backgroundColor: { red: 0.2, green: 0.6, blue: 0.4 }, // Green theme for education
+                                    textFormat: { bold: true, foregroundColor: { red: 1, green: 1, blue: 1 } },
+                                    horizontalAlignment: 'CENTER'
+                                }
+                            },
+                            fields: 'userEnteredFormat(backgroundColor,textFormat,horizontalAlignment)',
+                        }
+                    },
+                    // Protect submitted values column
+                    {
+                        addProtectedRange: {
+                            protectedRange: {
+                                range: {
+                                    sheetId: sheetId,
+                                    startColumnIndex: 0,
+                                    endColumnIndex: 2,
+                                },
+                                description: 'Verification fields and submitted values are read-only',
+                                warningOnly: true,
+                            }
+                        }
+                    },
+                    // Auto-resize columns
+                    {
+                        autoResizeDimensions: {
+                            dimensions: {
+                                sheetId: sheetId,
+                                dimension: 'COLUMNS',
+                                startIndex: 0,
+                                endIndex: 4,
+                            }
+                        }
+                    }
+                ]
+            }
+        });
+
+        // Make sheet publicly editable
+        await drive.permissions.create({
+            fileId: spreadsheetId,
+            requestBody: {
+                role: 'writer',
+                type: 'anyone',
+            },
+        });
+
+        const spreadsheetUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`;
+
+        console.log(`✅ Created education verification sheet: ${spreadsheetUrl}`);
+
+        return {
+            spreadsheetId,
+            spreadsheetUrl,
+            isMock: false
+        };
+
+    } catch (error) {
+        console.error('Error creating education verification sheet:', error.message);
+        throw error;
+    }
+};
+
+/**
+ * Create a police verification sheet for Tier 3 crime check
+ */
+const createPoliceVerificationSheet = async (candidateData, requestId) => {
+    try {
+        // Mock mode if not configured
+        if (!sheets) {
+            console.log('📝 MOCK: Creating Police Verification Sheet for', candidateData.candidateName);
+            return {
+                spreadsheetId: `mock_police_sheet_${requestId}`,
+                spreadsheetUrl: `https://docs.google.com/spreadsheets/d/mock_police_${requestId}`,
+                isMock: true
+            };
+        }
+
+        // Create new spreadsheet
+        const createResponse = await sheets.spreadsheets.create({
+            requestBody: {
+                properties: {
+                    title: `TrustCheck Police Verification - ${candidateData.candidateName} - ${requestId}`,
+                },
+                sheets: [{
+                    properties: {
+                        title: 'Police Verification Form',
+                        gridProperties: {
+                            frozenRowCount: 1,
+                        }
+                    }
+                }]
+            },
+        });
+
+        const spreadsheetId = createResponse.data.spreadsheetId;
+        const sheetId = createResponse.data.sheets[0].properties.sheetId;
+
+        // Prepare police verification data
+        const values = [
+            ['Verification Field', 'Submitted Value', 'Police Verification', 'Remarks'],
+            ['Candidate Name', candidateData.candidateName || 'N/A', '', ''],
+            ['Father\'s Name', candidateData.fatherName || 'N/A', '', ''],
+            ['Date of Birth', candidateData.dateOfBirth || 'N/A', '', ''],
+            ['Address to Verify', candidateData.address || 'N/A', '', ''],
+            ['Court Records Flag', candidateData.courtRecordsFound ? 'YES' : 'NO', '', ''],
+            ['Pending Cases Count', String(candidateData.pendingCases || 0), '', ''],
+            ['---', '--- VERIFICATION QUESTIONS ---', '', ''],
+            ['Does the person reside at this address?', 'N/A', '', 'Yes/No'],
+            ['Any known criminal history?', 'N/A', '', 'Yes/No'],
+            ['Is the person involved in any ongoing investigations?', 'N/A', '', 'Yes/No'],
+            ['Any pending cases against the person?', 'N/A', '', 'Yes/No'],
+            ['General character assessment', 'N/A', '', 'Good/Satisfactory/Unsatisfactory'],
+            ['Neighbor/Landlord References Checked?', 'N/A', '', 'Yes/No'],
+            ['Additional Remarks', 'N/A', '', ''],
+            ['Verifying Officer Name & Designation', 'N/A', '', ''],
+            ['Police Station & Stamp', 'N/A', '', ''],
+            ['Verification Date', 'N/A', '', ''],
+        ];
+
+        // Update sheet with data
+        await sheets.spreadsheets.values.update({
+            spreadsheetId,
+            range: 'Police Verification Form!A1:D18',
+            valueInputOption: 'RAW',
+            requestBody: { values },
+        });
+
+        // Format the sheet
+        await sheets.spreadsheets.batchUpdate({
+            spreadsheetId,
+            requestBody: {
+                requests: [
+                    // Header row formatting
+                    {
+                        repeatCell: {
+                            range: {
+                                sheetId: sheetId,
+                                startRowIndex: 0,
+                                endRowIndex: 1,
+                            },
+                            cell: {
+                                userEnteredFormat: {
+                                    backgroundColor: { red: 0.2, green: 0.3, blue: 0.5 }, // Dark blue theme
+                                    textFormat: { bold: true, foregroundColor: { red: 1, green: 1, blue: 1 } },
+                                    horizontalAlignment: 'CENTER'
+                                }
+                            },
+                            fields: 'userEnteredFormat(backgroundColor,textFormat,horizontalAlignment)',
+                        }
+                    },
+                    // Highlight court records flag if positive
+                    {
+                        repeatCell: {
+                            range: {
+                                sheetId: sheetId,
+                                startRowIndex: 5,
+                                endRowIndex: 7,
+                            },
+                            cell: {
+                                userEnteredFormat: {
+                                    backgroundColor: candidateData.courtRecordsFound
+                                        ? { red: 1, green: 0.9, blue: 0.9 }  // Light red if records found
+                                        : { red: 0.9, green: 1, blue: 0.9 }, // Light green if clear
+                                }
+                            },
+                            fields: 'userEnteredFormat(backgroundColor)',
+                        }
+                    },
+                    // Auto-resize columns
+                    {
+                        autoResizeDimensions: {
+                            dimensions: {
+                                sheetId: sheetId,
+                                dimension: 'COLUMNS',
+                                startIndex: 0,
+                                endIndex: 4,
+                            }
+                        }
+                    }
+                ]
+            }
+        });
+
+        // Make sheet publicly editable
+        await drive.permissions.create({
+            fileId: spreadsheetId,
+            requestBody: {
+                role: 'writer',
+                type: 'anyone',
+            },
+        });
+
+        const spreadsheetUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`;
+        console.log(`✅ Created police verification sheet: ${spreadsheetUrl}`);
+
+        return {
+            spreadsheetId,
+            spreadsheetUrl,
+            isMock: false
+        };
+
+    } catch (error) {
+        console.error('Error creating police verification sheet:', error.message);
+        throw error;
+    }
+};
+
 module.exports = {
     initGoogleSheets,
     createVerificationSheet,
+    createEducationVerificationSheet,
+    createPoliceVerificationSheet,
     getSheetResponses,
     hasHRResponded
 };

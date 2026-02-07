@@ -363,9 +363,307 @@ async function sendEscalationEmail(hrEmail, candidateName, sheetUrl, requestId) 
     }
 }
 
+/**
+ * Education verification email template
+ */
+const educationVerificationTemplate = `
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: linear-gradient(135deg, #2e7d32 0%, #4caf50 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+        .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
+        .button { display: inline-block; padding: 12px 30px; background: #2e7d32; color: white; text-decoration: none; border-radius: 5px; margin: 20px 0; }
+        .info-box { background: white; padding: 15px; border-left: 4px solid #2e7d32; margin: 20px 0; }
+        .footer { text-align: center; color: #666; font-size: 12px; margin-top: 30px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎓 Education Verification Request</h1>
+        </div>
+        <div class="content">
+            <p>Dear Registrar/Controller of Examinations,</p>
+            
+            <p>We are conducting an education background verification for <strong>{{studentName}}</strong> who claims to have studied at your institution.</p>
+            
+            <div class="info-box">
+                <h3>📋 What We Need:</h3>
+                <p>Please verify the education credentials by filling out the Google Sheet linked below. It will only take 2-3 minutes.</p>
+            </div>
+            
+            <p style="text-align: center;">
+                <a href="{{sheetUrl}}" class="button">📝 Open Verification Form</a>
+            </p>
+            
+            <div class="info-box">
+                <h3>ℹ️ Information to Verify:</h3>
+                <ul>
+                    <li>Student enrollment status</li>
+                    <li>Degree/qualification awarded</li>
+                    <li>Year of passing</li>
+                    <li>Grades/CGPA/Percentage</li>
+                    <li>Authenticity of certificate</li>
+                </ul>
+            </div>
+            
+            <p><strong>Verification ID:</strong> {{requestId}}</p>
+            
+            <p>If you have any questions, please reply to this email.</p>
+            
+            <p>Thank you for your cooperation!</p>
+            
+            <p>Best regards,<br><strong>TrustCheck AI Team</strong></p>
+        </div>
+        <div class="footer">
+            <p>This is an automated verification request from TrustCheck AI</p>
+            <p>Powered by Gemini AI</p>
+        </div>
+    </div>
+</body>
+</html>
+`;
+
+/**
+ * Send education verification email to university registrar
+ */
+async function sendEducationVerificationEmail(registrarEmail, studentName, sheetUrl, requestId, checkId = null) {
+    try {
+        // Mock mode
+        if (!transporter) {
+            console.log('=================================================');
+            console.log('📧 MOCK EMAIL: Education Verification');
+            console.log(`To: ${registrarEmail}`);
+            console.log(`Subject: Education Verification Request - ${studentName} [Check: ${checkId || requestId}]`);
+            console.log(`Sheet URL: ${sheetUrl}`);
+            console.log(`Check ID: ${checkId || requestId}`);
+            console.log('=================================================');
+
+            // Log activity even in mock mode
+            if (checkId) {
+                const { logActivity } = require('./database');
+                const template = handlebars.compile(educationVerificationTemplate);
+                const htmlBody = template({
+                    studentName,
+                    sheetUrl,
+                    requestId: checkId || requestId
+                });
+
+                await logActivity('check', checkId, 'EDUCATION_EMAIL_SENT', `Education verification email sent to ${registrarEmail}`, {
+                    registrarEmail,
+                    subject: `Education Verification Request - ${studentName} [Check: ${checkId || requestId}]`,
+                    emailBody: htmlBody,
+                    googleSheetsUrl: sheetUrl,
+                    status: 'SENT',
+                    messageId: `mock_edu_${Date.now()}`
+                });
+            }
+
+            return { success: true, messageId: `mock_edu_${Date.now()}`, isMock: true };
+        }
+
+        const template = handlebars.compile(educationVerificationTemplate);
+        const html = template({
+            studentName,
+            sheetUrl,
+            requestId: checkId || requestId
+        });
+
+        const subject = `Education Verification Request - ${studentName} [Check: ${checkId || requestId}]`;
+
+        const mailOptions = {
+            from: `TrustCheck AI <${process.env.EMAIL_USER}>`,
+            to: registrarEmail,
+            subject: subject,
+            html: html,
+            headers: {
+                'X-TrustCheck-ID': checkId || requestId,
+                'X-Check-Type': 'EDUCATION_VERIFICATION'
+            }
+        };
+
+        const info = await transporter.sendMail(mailOptions);
+        console.log(`✅ Education verification email sent to ${registrarEmail}: ${info.messageId}`);
+
+        // Log activity
+        if (checkId) {
+            const { logActivity } = require('./database');
+            await logActivity('check', checkId, 'EDUCATION_EMAIL_SENT', `Education verification email sent to ${registrarEmail}`, {
+                registrarEmail,
+                subject: mailOptions.subject,
+                emailBody: html,
+                googleSheetsUrl: sheetUrl,
+                status: 'SENT',
+                messageId: info.messageId
+            });
+        }
+
+        return { success: true, messageId: info.messageId, isMock: false };
+    } catch (error) {
+        console.error('Error sending education verification email:', error);
+        throw error;
+    }
+}
+
+/**
+ * Police verification email template
+ */
+const policeVerificationTemplate = `
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: linear-gradient(135deg, #1a237e 0%, #3949ab 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+        .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
+        .button { display: inline-block; padding: 12px 30px; background: #1a237e; color: white; text-decoration: none; border-radius: 5px; margin: 20px 0; }
+        .info-box { background: white; padding: 15px; border-left: 4px solid #1a237e; margin: 20px 0; }
+        .alert-box { background: #fff3e0; padding: 15px; border-left: 4px solid #ff9800; margin: 20px 0; }
+        .footer { text-align: center; color: #666; font-size: 12px; margin-top: 30px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚔 Police Verification Request</h1>
+        </div>
+        <div class="content">
+            <p>Dear Sir/Madam,</p>
+            
+            <p>We are conducting a background verification for <strong>{{candidateName}}</strong> as part of an employment screening process.</p>
+            
+            <div class="info-box">
+                <h3>📋 Verification Required:</h3>
+                <p>Please verify the following details by filling out the Google Sheet linked below. Your official input is essential for completing this background check.</p>
+            </div>
+            
+            <p style="text-align: center;">
+                <a href="{{sheetUrl}}" class="button">📝 Open Verification Form</a>
+            </p>
+            
+            <div class="alert-box">
+                <h3>⚠️ Important Note:</h3>
+                <p>This is an official background verification request. Please verify the candidate's address, criminal history, and general character as per standard police verification procedures.</p>
+            </div>
+            
+            <div class="info-box">
+                <h3>ℹ️ Information to Verify:</h3>
+                <ul>
+                    <li>Address verification</li>
+                    <li>Criminal record check</li>
+                    <li>Pending cases status</li>
+                    <li>General character assessment</li>
+                    <li>Neighbor/Landlord references</li>
+                </ul>
+            </div>
+            
+            <p><strong>Verification ID:</strong> {{requestId}}</p>
+            
+            <p>If you have any questions, please reply to this email.</p>
+            
+            <p>Thank you for your cooperation!</p>
+            
+            <p>Best regards,<br><strong>TrustCheck AI Team</strong></p>
+        </div>
+        <div class="footer">
+            <p>This is an automated verification request from TrustCheck AI</p>
+            <p>Background Verification System - Powered by Gemini AI</p>
+        </div>
+    </div>
+</body>
+</html>
+`;
+
+/**
+ * Send police verification email to local police station
+ */
+async function sendPoliceVerificationEmail(policeEmail, candidateName, sheetUrl, requestId, checkId = null) {
+    try {
+        // Mock mode
+        if (!transporter) {
+            console.log('=================================================');
+            console.log('📧 MOCK EMAIL: Police Verification');
+            console.log(`To: ${policeEmail}`);
+            console.log(`Subject: Police Verification Request - ${candidateName} [Check: ${checkId || requestId}]`);
+            console.log(`Sheet URL: ${sheetUrl}`);
+            console.log(`Check ID: ${checkId || requestId}`);
+            console.log('=================================================');
+
+            // Log activity even in mock mode
+            if (checkId) {
+                const { logActivity } = require('./database');
+                const template = handlebars.compile(policeVerificationTemplate);
+                const htmlBody = template({
+                    candidateName,
+                    sheetUrl,
+                    requestId: checkId || requestId
+                });
+
+                await logActivity('check', checkId, 'POLICE_EMAIL_SENT', `Police verification email sent to ${policeEmail}`, {
+                    policeEmail,
+                    subject: `Police Verification Request - ${candidateName} [Check: ${checkId || requestId}]`,
+                    emailBody: htmlBody,
+                    googleSheetsUrl: sheetUrl,
+                    status: 'SENT',
+                    messageId: `mock_police_${Date.now()}`
+                });
+            }
+
+            return { success: true, messageId: `mock_police_${Date.now()}`, isMock: true };
+        }
+
+        const template = handlebars.compile(policeVerificationTemplate);
+        const html = template({
+            candidateName,
+            sheetUrl,
+            requestId: checkId || requestId
+        });
+
+        const subject = `Police Verification Request - ${candidateName} [Check: ${checkId || requestId}]`;
+
+        const mailOptions = {
+            from: `TrustCheck AI <${process.env.EMAIL_USER}>`,
+            to: policeEmail,
+            subject: subject,
+            html: html,
+            headers: {
+                'X-TrustCheck-ID': checkId || requestId,
+                'X-Check-Type': 'POLICE_VERIFICATION'
+            }
+        };
+
+        const info = await transporter.sendMail(mailOptions);
+        console.log(`✅ Police verification email sent to ${policeEmail}: ${info.messageId}`);
+
+        // Log activity
+        if (checkId) {
+            const { logActivity } = require('./database');
+            await logActivity('check', checkId, 'POLICE_EMAIL_SENT', `Police verification email sent to ${policeEmail}`, {
+                policeEmail,
+                subject: mailOptions.subject,
+                emailBody: html,
+                googleSheetsUrl: sheetUrl,
+                status: 'SENT',
+                messageId: info.messageId
+            });
+        }
+
+        return { success: true, messageId: info.messageId, isMock: false };
+    } catch (error) {
+        console.error('Error sending police verification email:', error);
+        throw error;
+    }
+}
+
 module.exports = {
     initEmailService,
     sendVerificationEmail,
     sendReminderEmail,
-    sendEscalationEmail
+    sendEscalationEmail,
+    sendEducationVerificationEmail,
+    sendPoliceVerificationEmail
 };

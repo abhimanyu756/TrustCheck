@@ -29,7 +29,7 @@ const ClientCases = () => {
 
     const fetchCases = async () => {
         try {
-            const response = await axios.get(`http://localhost:3000/api/cases/client/${clientId}`);
+            const response = await axios.get(`/api/cases/client/${clientId}`);
             setCases(response.data);
         } catch (error) {
             console.error('Error fetching cases:', error);

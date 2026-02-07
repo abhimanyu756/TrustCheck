@@ -22,8 +22,8 @@ const VerificationDetails = () => {
         try {
             setLoading(true);
             const [statusRes, resultsRes] = await Promise.all([
-                axios.get(`http://localhost:3000/api/verify/${id}/status`),
-                axios.get(`http://localhost:3000/api/verify/${id}/results`)
+                axios.get(`/api/verify/${id}/status`),
+                axios.get(`/api/verify/${id}/results`)
             ]);
 
             setVerification(statusRes.data);

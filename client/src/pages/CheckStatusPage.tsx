@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import axios from 'axios';
 import Logo from '../components/Logo';
@@ -9,6 +9,8 @@ interface Check {
     caseId: string;
     checkType: string;
     companyName: string | null;
+    hrEmail?: string;
+    hrPhone?: string;
     status: string;
     aiAgentStatus: string;
     riskScore: number;
@@ -85,6 +87,22 @@ const INSTRUCTION_LABELS: { [key: string]: string } = {
     'red_checks_escalate': 'All RED checks escalate to CSE'
 };
 
+// Required documents per check type for execution
+const REQUIRED_DOCUMENTS: { [key: string]: { id: string; label: string }[] } = {
+    EDUCATION: [
+        { id: '10th_marksheet', label: '10th Marksheet' },
+        { id: '12th_marksheet', label: '12th Marksheet' },
+        { id: 'degree_marksheet', label: 'Degree Marksheet' }
+    ],
+    CRIME: [],
+    EMPLOYMENT: [
+        { id: 'salary_slip', label: 'Salary Slip' },
+        { id: 'relieving_letter', label: 'Relieving Letter' },
+        { id: 'arn_consent', label: 'ARN Consent Form' },
+        { id: 'experience_letter', label: 'Experience Letter' }
+    ]
+};
+
 const CheckStatusPage = () => {
     const { checkId } = useParams<{ checkId: string }>();
     const [check, setCheck] = useState<Check | null>(null);
@@ -96,6 +114,13 @@ const CheckStatusPage = () => {
     const [emailResponses, setEmailResponses] = useState<EmailResponse[]>([]);
     const [loading, setLoading] = useState(true);
 
+    // Call HR State
+    const [showCallModal, setShowCallModal] = useState(false);
+    const [hrPhone, setHrPhone] = useState('');
+    const [callStatus, setCallStatus] = useState<string | null>(null);
+    const [callLoading, setCallLoading] = useState(false);
+    const [callError, setCallError] = useState<string | null>(null);
+
     useEffect(() => {
         if (checkId) {
             fetchCheckDetails();
@@ -105,31 +130,34 @@ const CheckStatusPage = () => {
     const fetchCheckDetails = async () => {
         try {
             // Fetch check details
-            const checkResponse = await axios.get(`http://localhost:3000/api/checks/${checkId}`);
+            const checkResponse = await axios.get(`/api/checks/${checkId}`);
             setCheck(checkResponse.data);
+            if (checkResponse.data.hrPhone) {
+                setHrPhone(checkResponse.data.hrPhone);
+            }
 
             // Fetch case details
-            const caseResponse = await axios.get(`http://localhost:3000/api/cases/${checkResponse.data.caseId}`);
+            const caseResponse = await axios.get(`/api/cases/${checkResponse.data.caseId}`);
             setCaseData(caseResponse.data);
 
             // Fetch client config
-            const clientResponse = await axios.get(`http://localhost:3000/api/clients/${caseResponse.data.clientId}`);
+            const clientResponse = await axios.get(`/api/clients/${caseResponse.data.clientId}`);
             setClientConfig(clientResponse.data);
 
             // Fetch documents
-            const docsResponse = await axios.get(`http://localhost:3000/api/document-upload/check/${checkId}`);
+            const docsResponse = await axios.get(`/api/document-upload/check/${checkId}`);
             setDocuments(docsResponse.data.documents);
 
             // Fetch activity logs
-            const logsResponse = await axios.get(`http://localhost:3000/api/activity-logs/check/${checkId}`);
+            const logsResponse = await axios.get(`/api/activity-logs/check/${checkId}`);
             setActivityLogs(logsResponse.data.logs);
 
             // Fetch emails
-            const emailsResponse = await axios.get(`http://localhost:3000/api/emails/check/${checkId}`);
+            const emailsResponse = await axios.get(`/api/emails/check/${checkId}`);
             setEmails(emailsResponse.data.emails || []);
 
             // Fetch email responses
-            const responsesResponse = await axios.get(`http://localhost:3000/api/emails/responses/check/${checkId}`);
+            const responsesResponse = await axios.get(`/api/emails/responses/check/${checkId}`);
             setEmailResponses(responsesResponse.data.responses || []);
 
         } catch (error) {
@@ -159,6 +187,63 @@ const CheckStatusPage = () => {
             case 'FAILED': return '❌';
             case 'PENDING': return '⏸️';
             default: return '⏸️';
+        }
+    };
+
+    // Handle initiating AI call to HR
+    const handleInitiateCall = async () => {
+        if (!hrPhone.trim()) {
+            setCallError('Please enter HR phone number');
+            return;
+        }
+
+        // Validate phone format
+        const phoneRegex = /^\+?[1-9]\d{9,14}$/;
+        if (!phoneRegex.test(hrPhone.replace(/[\s-]/g, ''))) {
+            setCallError('Invalid phone format. Use: +91XXXXXXXXXX');
+            return;
+        }
+
+        setCallLoading(true);
+        setCallError(null);
+
+        try {
+            const response = await axios.post(
+                `/api/calls/${checkId}/initiate`,
+                { hrPhone }
+            );
+
+            if (response.data.success) {
+                setCallStatus(response.data.status);
+                setShowCallModal(false);
+
+                // Poll for call status updates
+                const pollInterval = setInterval(async () => {
+                    try {
+                        const statusResponse = await axios.get(
+                            `/api/calls/${checkId}/status`
+                        );
+                        setCallStatus(statusResponse.data.status);
+
+                        if (['COMPLETED', 'FAILED', 'NO-ANSWER', 'BUSY', 'ENDED_BY_USER'].includes(statusResponse.data.status)) {
+                            clearInterval(pollInterval);
+                            // Refresh activity logs
+                            const logsResponse = await axios.get(`/api/activity-logs/check/${checkId}`);
+                            setActivityLogs(logsResponse.data.logs);
+                        }
+                    } catch (err) {
+                        console.error('Error polling call status:', err);
+                    }
+                }, 3000);
+
+                // Clear interval after 5 minutes max
+                setTimeout(() => clearInterval(pollInterval), 300000);
+            }
+        } catch (error: any) {
+            console.error('Error initiating call:', error);
+            setCallError(error.response?.data?.error || 'Failed to initiate call');
+        } finally {
+            setCallLoading(false);
         }
     };
 
@@ -419,6 +504,41 @@ const CheckStatusPage = () => {
                                     </div>
                                 </div>
                             )}
+
+                            {/* Call HR Button - Employment checks only */}
+                            {check.checkType === 'EMPLOYMENT' && (
+                                <div className="flex items-start gap-4 mt-4 pt-4 border-t border-slate-200">
+                                    <div className="w-10 h-10 rounded-full flex items-center justify-center bg-purple-100 text-purple-600">
+                                        📞
+                                    </div>
+                                    <div className="flex-1">
+                                        <h4 className="font-semibold text-slate-800">AI Phone Verification</h4>
+                                        <p className="text-sm text-slate-600 mb-3">Call HR directly using AI-powered voice verification</p>
+
+                                        {callStatus ? (
+                                            <div className="bg-purple-50 border border-purple-200 rounded-lg p-3">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="animate-pulse">📞</span>
+                                                    <span className="text-sm font-medium text-purple-800">Call Status: {callStatus}</span>
+                                                </div>
+                                                {callStatus === 'COMPLETED' && (
+                                                    <p className="text-xs text-green-600 mt-2">✓ Call completed - check activity logs for responses</p>
+                                                )}
+                                            </div>
+                                        ) : (
+                                            <button
+                                                onClick={() => setShowCallModal(true)}
+                                                className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm font-medium"
+                                            >
+                                                📞 Call HR Now
+                                            </button>
+                                        )}
+                                        {callError && (
+                                            <p className="text-xs text-red-600 mt-2">{callError}</p>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
 
@@ -555,6 +675,17 @@ const CheckStatusPage = () => {
                                                     {log.action.replace(/_/g, ' ')}
                                                 </p>
                                                 <p className="text-sm text-slate-600 mt-1">{log.description}</p>
+
+                                                {/* Show View Transcript link for call-related actions */}
+                                                {(log.action === 'CALL_COMPLETED' || log.action === 'CALL_VERIFICATION_DATA') && (
+                                                    <Link
+                                                        to={`/check/${checkId}/call-transcript`}
+                                                        className="inline-flex items-center gap-1 text-sm text-purple-600 hover:text-purple-800 hover:underline mt-2 font-medium"
+                                                    >
+                                                        📞 View Call Transcript →
+                                                    </Link>
+                                                )}
+
                                                 {(() => {
                                                     // Parse metadata if it's a string
                                                     let parsedMetadata = log.metadata;
@@ -567,6 +698,11 @@ const CheckStatusPage = () => {
                                                     }
 
                                                     if (!parsedMetadata || typeof parsedMetadata !== 'object') return null;
+
+                                                    // Skip showing raw metadata for call entries (use transcript page instead)
+                                                    if (log.action === 'CALL_COMPLETED' || log.action === 'CALL_VERIFICATION_DATA') {
+                                                        return null;
+                                                    }
 
                                                     // Only show these specific fields
                                                     const displayableFields = ['fileName', 'documentType', 'fileSize', 'riskScore', 'zone', 'status'];
@@ -610,7 +746,17 @@ const CheckStatusPage = () => {
                                 <button
                                     type="button"
                                     onClick={() => {
-                                        axios.post(`http://localhost:3000/api/checks/${checkId}/execute`)
+                                        // Validate required documents before execution
+                                        const requiredDocs = REQUIRED_DOCUMENTS[check.checkType] || [];
+                                        const uploadedDocTypes = documents.map(d => d.documentType);
+                                        const missingDocs = requiredDocs.filter(doc => !uploadedDocTypes.includes(doc.id));
+
+                                        if (missingDocs.length > 0) {
+                                            alert(`Cannot execute check. Missing required documents:\n\n${missingDocs.map(d => '• ' + d.label).join('\n')}\n\nPlease upload all required documents first.`);
+                                            return;
+                                        }
+
+                                        axios.post(`/api/checks/${checkId}/execute`)
                                             .then(() => {
                                                 alert('Check executed!');
                                                 fetchCheckDetails();
@@ -639,6 +785,83 @@ const CheckStatusPage = () => {
                     </div>
                 </div>
             </div>
+
+            {/* Call HR Modal */}
+            {showCallModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md mx-4">
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 className="text-xl font-semibold text-slate-800">📞 Call HR for Verification</h3>
+                            <button
+                                onClick={() => {
+                                    setShowCallModal(false);
+                                    setCallError(null);
+                                }}
+                                className="text-slate-400 hover:text-slate-600"
+                            >
+                                ✕
+                            </button>
+                        </div>
+
+                        <p className="text-sm text-slate-600 mb-4">
+                            Enter the HR phone number. Our AI will call and conduct a verification conversation automatically.
+                        </p>
+
+                        <div className="mb-4">
+                            <label className="block text-sm font-medium text-slate-700 mb-2">
+                                HR Phone Number
+                            </label>
+                            <input
+                                type="tel"
+                                value={hrPhone}
+                                onChange={(e) => setHrPhone(e.target.value)}
+                                placeholder="+91 9876543210"
+                                className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none"
+                            />
+                            <p className="text-xs text-slate-500 mt-1">Format: +91XXXXXXXXXX or country code + number</p>
+                            {callError && (
+                                <p className="text-xs text-red-600 mt-2">{callError}</p>
+                            )}
+                        </div>
+
+                        <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 mb-4">
+                            <p className="text-xs text-purple-800">
+                                <strong>What will happen:</strong><br />
+                                1. AI will call the HR number<br />
+                                2. Verify employee: {caseData?.employeeName}<br />
+                                3. Ask about employment dates, designation, exit type<br />
+                                4. Record responses in the system
+                            </p>
+                        </div>
+
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => {
+                                    setShowCallModal(false);
+                                    setCallError(null);
+                                }}
+                                className="flex-1 px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleInitiateCall}
+                                disabled={callLoading}
+                                className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                            >
+                                {callLoading ? (
+                                    <>
+                                        <span className="animate-spin">⏳</span>
+                                        Calling...
+                                    </>
+                                ) : (
+                                    <>📞 Start Call</>
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

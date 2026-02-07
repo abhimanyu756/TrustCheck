@@ -60,7 +60,7 @@ const StatusDashboard = () => {
 
     const fetchDashboardData = async () => {
         try {
-            const response = await axios.get('http://localhost:3000/api/dashboard/overview');
+            const response = await axios.get('/api/dashboard/overview');
             setDashboardData(response.data.data);
         } catch (error) {
             console.error('Error fetching dashboard data:', error);
@@ -71,7 +71,7 @@ const StatusDashboard = () => {
 
     const fetchStats = async () => {
         try {
-            const response = await axios.get('http://localhost:3000/api/dashboard/stats');
+            const response = await axios.get('/api/dashboard/stats');
             setStats(response.data.stats);
         } catch (error) {
             console.error('Error fetching stats:', error);

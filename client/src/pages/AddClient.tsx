@@ -155,7 +155,7 @@ const AddClient = () => {
         setLoading(true);
 
         try {
-            const response = await axios.post('http://localhost:3000/api/clients', formData);
+            const response = await axios.post('/api/clients', formData);
             const clientId = response.data.clientId;
 
             // Redirect to add employees page

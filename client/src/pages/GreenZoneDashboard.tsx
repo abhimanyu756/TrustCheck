@@ -33,7 +33,7 @@ export default function GreenZoneDashboard() {
 
     const fetchGreenZoneChecks = async () => {
         try {
-            const response = await fetch('http://localhost:3000/api/zones/green');
+            const response = await fetch('/api/zones/green');
             const data = await response.json();
             if (data.success) {
                 setChecks(data.checks);
@@ -47,7 +47,7 @@ export default function GreenZoneDashboard() {
 
     const fetchStats = async () => {
         try {
-            const response = await fetch('http://localhost:3000/api/zones/stats');
+            const response = await fetch('/api/zones/stats');
             const data = await response.json();
             if (data.success) {
                 setStats(data.stats);

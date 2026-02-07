@@ -24,7 +24,7 @@ const ClientDashboard = () => {
 
     const fetchClients = async () => {
         try {
-            const response = await axios.get('http://localhost:3000/api/clients');
+            const response = await axios.get('/api/clients');
             setClients(response.data);
         } catch (error) {
             console.error('Error fetching clients:', error);

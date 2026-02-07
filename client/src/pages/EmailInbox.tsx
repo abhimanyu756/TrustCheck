@@ -52,15 +52,15 @@ const EmailInbox = () => {
         try {
             // Fetch sent emails
             const emailsUrl = checkId
-                ? `http://localhost:3000/api/emails/check/${checkId}`
-                : 'http://localhost:3000/api/emails/all';
+                ? `/api/emails/check/${checkId}`
+                : '/api/emails/all';
             const emailsResponse = await axios.get(emailsUrl);
             setEmails(emailsResponse.data.emails || []);
 
             // Fetch HR responses
             const responsesUrl = checkId
-                ? `http://localhost:3000/api/emails/responses/check/${checkId}`
-                : 'http://localhost:3000/api/emails/responses/all';
+                ? `/api/emails/responses/check/${checkId}`
+                : '/api/emails/responses/all';
             const responsesResponse = await axios.get(responsesUrl);
             setResponses(responsesResponse.data.responses || []);
 

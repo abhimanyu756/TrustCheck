@@ -36,7 +36,7 @@ export default function RedZoneDashboard() {
 
     const fetchRedZoneChecks = async () => {
         try {
-            const response = await fetch('http://localhost:3000/api/zones/red');
+            const response = await fetch('/api/zones/red');
             const data = await response.json();
             if (data.success) {
                 setChecks(data.checks);
@@ -50,7 +50,7 @@ export default function RedZoneDashboard() {
 
     const fetchStats = async () => {
         try {
-            const response = await fetch('http://localhost:3000/api/zones/stats');
+            const response = await fetch('/api/zones/stats');
             const data = await response.json();
             if (data.success) {
                 setStats(data.stats);
@@ -62,7 +62,7 @@ export default function RedZoneDashboard() {
 
     const handleReview = async (checkId: string, decision: 'APPROVED' | 'REJECTED') => {
         try {
-            const response = await fetch(`http://localhost:3000/api/zones/review/${checkId}`, {
+            const response = await fetch(`/api/zones/review/${checkId}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({

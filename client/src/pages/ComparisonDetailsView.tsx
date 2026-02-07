@@ -26,7 +26,7 @@ export default function ComparisonDetailsView() {
 
     const fetchComparisonDetails = async () => {
         try {
-            const response = await fetch(`http://localhost:3000/api/zones/comparison/${checkId}`);
+            const response = await fetch(`/api/zones/comparison/${checkId}`);
             const result = await response.json();
             if (result.success) {
                 setData(result);

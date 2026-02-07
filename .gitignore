@@ -24,3 +24,8 @@ dist-ssr
 *.sw?
 *.env
 .env
+
+# Deployment artifacts
+*.tar
+deploy-server.sh
+.npmrc

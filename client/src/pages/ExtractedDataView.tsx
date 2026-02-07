@@ -34,7 +34,7 @@ const ExtractedDataView = () => {
 
     const fetchDocuments = async () => {
         try {
-            const response = await axios.get(`http://localhost:3000/api/document-upload/case/${caseId}`);
+            const response = await axios.get(`/api/document-upload/case/${caseId}`);
             setDocuments(response.data.documents);
         } catch (error) {
             console.error('Error fetching documents:', error);

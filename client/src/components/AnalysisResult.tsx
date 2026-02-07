@@ -165,7 +165,7 @@ export const AnalysisResult: React.FC<AnalysisResultProps> = ({ data, onReset })
                                 btn.innerText = "Sending...";
 
                                 try {
-                                    const res = await fetch('http://localhost:3000/api/verify/initiate', {
+                                    const res = await fetch('/api/verify/initiate', {
                                         method: 'POST',
                                         headers: { 'Content-Type': 'application/json' },
                                         body: JSON.stringify({

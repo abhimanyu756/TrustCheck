@@ -37,14 +37,14 @@ const EmailThreadView = () => {
     const fetchEmailThread = async () => {
         try {
             // Fetch all emails and find the one we need
-            const emailsResponse = await axios.get('http://localhost:3000/api/emails/all');
+            const emailsResponse = await axios.get('/api/emails/all');
             const foundEmail = emailsResponse.data.emails.find((e: Email) => e.emailId === emailId);
 
             if (foundEmail) {
                 setEmail(foundEmail);
 
                 // Fetch response for this check
-                const responsesResponse = await axios.get(`http://localhost:3000/api/emails/responses/check/${foundEmail.checkId}`);
+                const responsesResponse = await axios.get(`/api/emails/responses/check/${foundEmail.checkId}`);
                 if (responsesResponse.data.responses.length > 0) {
                     setResponse(responsesResponse.data.responses[0]);
                 }

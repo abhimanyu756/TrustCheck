@@ -24,7 +24,7 @@ export const Dashboard: React.FC = () => {
 
     const fetchRequests = async () => {
         try {
-            const res = await fetch('http://localhost:3000/api/dashboard/requests');
+            const res = await fetch('/api/dashboard/requests');
             const data = await res.json();
             setRequests(data);
         } catch (err) {

@@ -19,7 +19,9 @@ import EmailInbox from './pages/EmailInbox';
 import EmailThreadView from './pages/EmailThreadView';
 import GreenZoneDashboard from './pages/GreenZoneDashboard';
 import RedZoneDashboard from './pages/RedZoneDashboard';
+import SupervisorDashboard from './pages/SupervisorDashboard';
 import ComparisonDetailsView from './pages/ComparisonDetailsView';
+import CallTranscriptPage from './pages/CallTranscriptPage';
 import { ToastProvider } from './contexts/ToastContext';
 import ExtractedDataView from './pages/ExtractedDataView';
 
@@ -42,7 +44,7 @@ function Home() {
     formData.append('document', file);
 
     try {
-      const response = await fetch('http://localhost:3000/api/documents/analyze', {
+      const response = await fetch('/api/documents/analyze', {
         method: 'POST',
         body: formData,
       });
@@ -275,6 +277,7 @@ function App() {
           <Route path="/cases/:caseId" element={<CaseDetails />} />
           <Route path="/uploader" element={<UploaderDashboard />} />
           <Route path="/verifier" element={<VerifierDashboard />} />
+          <Route path="/supervisor" element={<SupervisorDashboard />} />
           <Route path="/check-status/:checkId" element={<CheckStatusPage />} />
           <Route path="/emails" element={<EmailInbox />} />
           <Route path="/emails/:checkId" element={<EmailInbox />} />
@@ -283,6 +286,7 @@ function App() {
           <Route path="/zones/red" element={<RedZoneDashboard />} />
           <Route path="/zones/comparison/:checkId" element={<ComparisonDetailsView />} />
           <Route path="/cases/:caseId/extracted-data" element={<ExtractedDataView />} />
+          <Route path="/check/:checkId/call-transcript" element={<CallTranscriptPage />} />
         </Routes>
       </BrowserRouter>
     </ToastProvider>

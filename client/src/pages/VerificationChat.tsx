@@ -54,7 +54,7 @@ export const VerificationChat: React.FC = () => {
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const res = await fetch(`http://localhost:3000/api/verify/${id}`);
+                const res = await fetch(`/api/verify/${id}`);
                 const data = await res.json();
                 setRequest(data);
                 if (data.chatHistory) setMessages(data.chatHistory);
@@ -77,7 +77,7 @@ export const VerificationChat: React.FC = () => {
         setSending(true);
 
         try {
-            await fetch(`http://localhost:3000/api/verify/${id}/chat`, {
+            await fetch(`/api/verify/${id}/chat`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ message: userMsg.content }),

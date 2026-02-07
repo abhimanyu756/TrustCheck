@@ -20,7 +20,7 @@ export default function TestChat() {
         setLoading(true);
 
         try {
-            const response = await fetch('http://localhost:3000/api/chat/test', {
+            const response = await fetch('/api/chat/test', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ message: input })

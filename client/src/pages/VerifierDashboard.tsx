@@ -37,6 +37,22 @@ interface Document {
     uploadedAt: string;
 }
 
+// Required documents per check type for execution
+const REQUIRED_DOCUMENTS: { [key: string]: { id: string; label: string }[] } = {
+    EDUCATION: [
+        { id: '10th_marksheet', label: '10th Marksheet' },
+        { id: '12th_marksheet', label: '12th Marksheet' },
+        { id: 'degree_marksheet', label: 'Degree Marksheet' }
+    ],
+    CRIME: [],
+    EMPLOYMENT: [
+        { id: 'salary_slip', label: 'Salary Slip' },
+        { id: 'relieving_letter', label: 'Relieving Letter' },
+        { id: 'arn_consent', label: 'ARN Consent Form' },
+        { id: 'experience_letter', label: 'Experience Letter' }
+    ]
+};
+
 const VerifierDashboard = () => {
     const { showToast } = useToast();
     const [clients, setClients] = useState<Client[]>([]);
@@ -74,7 +90,7 @@ const VerifierDashboard = () => {
 
     const fetchClients = async () => {
         try {
-            const response = await axios.get('http://localhost:3000/api/clients');
+            const response = await axios.get('/api/clients');
             setClients(response.data);
         } catch (error) {
             console.error('Error fetching clients:', error);
@@ -85,7 +101,7 @@ const VerifierDashboard = () => {
 
     const fetchCases = async (clientId: string) => {
         try {
-            const response = await axios.get(`http://localhost:3000/api/cases/client/${clientId}`);
+            const response = await axios.get(`/api/cases/client/${clientId}`);
             setCases(response.data);
         } catch (error) {
             console.error('Error fetching cases:', error);
@@ -94,7 +110,7 @@ const VerifierDashboard = () => {
 
     const fetchChecks = async (caseId: string) => {
         try {
-            const response = await axios.get(`http://localhost:3000/api/checks/case/${caseId}`);
+            const response = await axios.get(`/api/checks/case/${caseId}`);
             setChecks(response.data);
         } catch (error) {
             console.error('Error fetching checks:', error);
@@ -103,7 +119,7 @@ const VerifierDashboard = () => {
 
     const fetchDocumentsForCheck = async (checkId: string) => {
         try {
-            const response = await axios.get(`http://localhost:3000/api/document-upload/check/${checkId}`);
+            const response = await axios.get(`/api/document-upload/check/${checkId}`);
             setDocuments(prev => ({
                 ...prev,
                 [checkId]: response.data.documents
@@ -113,10 +129,21 @@ const VerifierDashboard = () => {
         }
     };
 
-    const executeCheck = async (checkId: string) => {
+    const executeCheck = async (checkId: string, checkType: string) => {
+        // Validate required documents before execution
+        const requiredDocs = REQUIRED_DOCUMENTS[checkType] || [];
+        const checkDocs = documents[checkId] || [];
+        const uploadedDocTypes = checkDocs.map(d => d.documentType);
+        const missingDocs = requiredDocs.filter(doc => !uploadedDocTypes.includes(doc.id));
+
+        if (missingDocs.length > 0) {
+            showToast(`Missing required documents: ${missingDocs.map(d => d.label).join(', ')}`, 'error');
+            return;
+        }
+
         setExecuting(checkId);
         try {
-            await axios.post(`http://localhost:3000/api/checks/${checkId}/execute`);
+            await axios.post(`/api/checks/${checkId}/execute`);
             showToast('Check executed successfully!', 'success');
             // Refresh checks to get updated status
             if (selectedCase) {
@@ -135,7 +162,7 @@ const VerifierDashboard = () => {
 
         setExecuting('all');
         try {
-            await axios.post(`http://localhost:3000/api/cases/${selectedCase}/execute`);
+            await axios.post(`/api/cases/${selectedCase}/execute`);
             showToast('All checks executed successfully!', 'success');
             fetchChecks(selectedCase);
         } catch (error) {
@@ -332,7 +359,7 @@ const VerifierDashboard = () => {
                                             {/* Execute Button */}
                                             <div className="flex gap-2">
                                                 <button
-                                                    onClick={() => executeCheck(check.checkId)}
+                                                    onClick={() => executeCheck(check.checkId, check.checkType)}
                                                     disabled={executing !== null || check.status === 'COMPLETED'}
                                                     className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                                                 >

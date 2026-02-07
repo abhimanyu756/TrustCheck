@@ -23,12 +23,31 @@ const documentUploadRoutes = require('./routes/documentUploadRoutes');
 const activityLogRoutes = require('./routes/activityLogRoutes');
 const emailRoutes = require('./routes/emailRoutes');
 const zoneRoutes = require('./routes/zoneRoutes');
+const callRoutes = require('./routes/callRoutes');
 
 app.use(cors());
 app.use(express.json());
+app.use(express.urlencoded({ extended: true })); // For Twilio webhooks
+
+// Middleware to bypass ngrok browser warning for Twilio webhooks
+app.use('/api/calls/webhook', (req, res, next) => {
+    // Set headers that help with ngrok interstitial
+    res.setHeader('ngrok-skip-browser-warning', 'true');
+    console.log(`🎤 Webhook received: ${req.path}`, req.body);
+    next();
+});
 
 app.get('/', (req, res) => {
     res.send('TrustCheck API is running');
+});
+
+// Health check endpoint for container orchestration
+app.get('/health', (req, res) => {
+    res.status(200).json({
+        status: 'healthy',
+        timestamp: new Date().toISOString(),
+        version: '1.0.0'
+    });
 });
 
 app.use('/api/documents', uploadRoutes);
@@ -43,6 +62,7 @@ app.use('/api/document-upload', documentUploadRoutes);
 app.use('/api/activity-logs', activityLogRoutes);
 app.use('/api/emails', emailRoutes);
 app.use('/api/zones', zoneRoutes);
+app.use('/api/calls', callRoutes);
 
 // Initialize all services, then start server
 Promise.all([

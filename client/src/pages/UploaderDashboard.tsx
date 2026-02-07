@@ -63,6 +63,12 @@ const UploaderDashboard = () => {
     const [documents, setDocuments] = useState<Document[]>([]);
     const [uploading, setUploading] = useState(false);
     const [loading, setLoading] = useState(true);
+    const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+    const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+        setToast({ message, type });
+        setTimeout(() => setToast(null), 3000);
+    };
 
     useEffect(() => {
         fetchClients();
@@ -88,7 +94,7 @@ const UploaderDashboard = () => {
 
     const fetchClients = async () => {
         try {
-            const response = await axios.get('http://localhost:3000/api/clients');
+            const response = await axios.get('/api/clients');
             setClients(response.data);
         } catch (error) {
             console.error('Error fetching clients:', error);
@@ -99,7 +105,7 @@ const UploaderDashboard = () => {
 
     const fetchCases = async (clientId: string) => {
         try {
-            const response = await axios.get(`http://localhost:3000/api/cases/client/${clientId}`);
+            const response = await axios.get(`/api/cases/client/${clientId}`);
             setCases(response.data);
         } catch (error) {
             console.error('Error fetching cases:', error);
@@ -108,7 +114,7 @@ const UploaderDashboard = () => {
 
     const fetchChecks = async (caseId: string) => {
         try {
-            const response = await axios.get(`http://localhost:3000/api/checks/case/${caseId}`);
+            const response = await axios.get(`/api/checks/case/${caseId}`);
             setChecks(response.data);
         } catch (error) {
             console.error('Error fetching checks:', error);
@@ -117,7 +123,7 @@ const UploaderDashboard = () => {
 
     const fetchDocuments = async (checkId: string) => {
         try {
-            const response = await axios.get(`http://localhost:3000/api/document-upload/check/${checkId}`);
+            const response = await axios.get(`/api/document-upload/check/${checkId}`);
             setDocuments(response.data.documents);
         } catch (error) {
             console.error('Error fetching documents:', error);
@@ -136,12 +142,12 @@ const UploaderDashboard = () => {
         formData.append('documentType', documentType);
 
         try {
-            await axios.post('http://localhost:3000/api/document-upload/upload', formData);
-            alert('Document uploaded successfully!');
+            await axios.post('/api/document-upload/upload', formData);
+            showToast('Document uploaded successfully!', 'success');
             fetchDocuments(selectedCheck.checkId);
         } catch (error) {
             console.error('Error uploading document:', error);
-            alert('Failed to upload document');
+            showToast('Failed to upload document', 'error');
         } finally {
             setUploading(false);
         }
@@ -149,7 +155,7 @@ const UploaderDashboard = () => {
 
     const handleDownload = async (documentId: string, fileName: string) => {
         try {
-            const response = await axios.get(`http://localhost:3000/api/document-upload/download/${documentId}`, {
+            const response = await axios.get(`/api/document-upload/download/${documentId}`, {
                 responseType: 'blob'
             });
             const url = window.URL.createObjectURL(new Blob([response.data]));
@@ -171,14 +177,14 @@ const UploaderDashboard = () => {
         }
 
         try {
-            await axios.delete(`http://localhost:3000/api/document-upload/${documentId}`);
-            alert('Document deleted successfully!');
+            await axios.delete(`/api/document-upload/${documentId}`);
+            showToast('Document deleted successfully!', 'success');
             if (selectedCheck) {
                 fetchDocuments(selectedCheck.checkId);
             }
         } catch (error) {
             console.error('Error deleting document:', error);
-            alert('Failed to delete document');
+            showToast('Failed to delete document', 'error');
         }
     };
 
@@ -204,6 +210,21 @@ const UploaderDashboard = () => {
 
     return (
         <div className="min-h-screen bg-slate-50 py-8 px-4">
+            {/* Toast Notification */}
+            {toast && (
+                <div className={`fixed top-4 right-4 z-50 px-6 py-4 rounded-lg shadow-lg transition-all duration-300 ${toast.type === 'success'
+                        ? 'bg-green-500 text-white'
+                        : 'bg-red-500 text-white'
+                    }`}>
+                    <div className="flex items-center gap-3">
+                        <span className="text-xl">
+                            {toast.type === 'success' ? '✓' : '✕'}
+                        </span>
+                        <p className="font-medium">{toast.message}</p>
+                    </div>
+                </div>
+            )}
+
             <div className="max-w-7xl mx-auto">
                 {/* Header */}
                 <div className="mb-8">
@@ -317,6 +338,12 @@ const UploaderDashboard = () => {
                                     <p className="text-sm text-slate-500 mt-1">Check ID: {selectedCheck.checkId}</p>
                                 </div>
 
+                                {uploading && (
+                                    <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg text-center">
+                                        <p className="text-blue-700">Uploading document...</p>
+                                    </div>
+                                )}
+
                                 <div className="space-y-4">
                                     {getDocumentTypes().map(docType => {
                                         const uploaded = isDocumentUploaded(docType.id);
@@ -394,12 +421,6 @@ const UploaderDashboard = () => {
                                         );
                                     })}
                                 </div>
-
-                                {uploading && (
-                                    <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg text-center">
-                                        <p className="text-blue-700">Uploading document...</p>
-                                    </div>
-                                )}
                             </div>
                         ) : (
                             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-12 text-center">
