@@ -318,6 +318,14 @@ export default function GreenZoneDashboard() {
                                         >
                                             Comparison
                                         </Link>
+                                        {check.checkType === 'EMPLOYMENT' && (
+                                            <Link
+                                                to={`/call-transcript/${check.checkId}`}
+                                                className="px-4 py-2 border-2 border-purple-600 text-purple-600 rounded-lg hover:bg-purple-50 transition-colors text-sm font-medium text-center flex items-center justify-center gap-1"
+                                            >
+                                                📞 Call Analysis
+                                            </Link>
+                                        )}
                                     </div>
                                 </div>
                             </div>

@@ -18,6 +18,11 @@ interface Check {
     verificationData: any;
     discrepancies: string[];
     createdAt: string;
+    // Education fields
+    registrarEmail?: string;
+    educationInstitution?: string;
+    educationDegree?: string;
+    educationYear?: string;
 }
 
 interface Document {
@@ -49,6 +54,7 @@ interface ActivityLog {
     description: string;
     timestamp: string;
     metadata: any;
+    details?: any;
 }
 
 interface Email {
@@ -61,6 +67,7 @@ interface Email {
     sentAt: string;
     status: string;
     googleSheetsUrl?: string;
+    recipient?: string;
 }
 
 interface EmailResponse {
@@ -275,6 +282,48 @@ const CheckStatusPage = () => {
     // Check if we have any HR responses
     const hrResponded = emailResponses.length > 0 || verificationData.verified === true;
 
+    // Helper function to get risk score explanation
+    const getRiskExplanation = (score: number): string => {
+        if (score <= 20) return 'No issues detected';
+        if (score <= 40) return 'Minor concerns identified';
+        if (score <= 60) return 'Moderate risk - review recommended';
+        if (score <= 80) return 'Significant concerns found';
+        return 'High risk - immediate review required';
+    };
+
+    // Helper function to extract tier data from activity logs
+    const getTierData = (tierNumber: number) => {
+        const tierActions: { [key: number]: string[] } = {
+            1: ['TIER1_COMPLETE', 'DOCUMENT_ANALYSIS_COMPLETE'],
+            2: ['TIER2_VERIFIED', 'TIER2_NOT_FOUND', 'TIER2_UNAVAILABLE', 'NAD_VERIFIED'],
+            3: ['TIER3_EMAIL_SENT', 'EDUCATION_EMAIL_SENT', 'UNIVERSITY_OUTREACH', 'EMAIL_SENT']
+        };
+
+        const actions = tierActions[tierNumber] || [];
+        const log = activityLogs.find(l => actions.some(a => l.action?.includes(a)));
+
+        if (log) {
+            return {
+                found: true,
+                description: log.description || '',
+                details: log.details || {},
+                timestamp: log.timestamp
+            };
+        }
+        return { found: false, description: '', details: {}, timestamp: '' };
+    };
+
+    // Get tier data for display
+    const tier1Data = getTierData(1);
+    const tier2Data = getTierData(2);
+    const tier3Data = getTierData(3);
+
+    // Check if education email was sent
+    const educationEmailSent = activityLogs.some(l =>
+        l.action?.includes('EDUCATION_EMAIL_SENT') ||
+        l.action?.includes('UNIVERSITY_OUTREACH')
+    );
+
     return (
         <div className="min-h-screen bg-slate-50 py-8 px-4">
             <div className="max-w-6xl mx-auto">
@@ -290,7 +339,17 @@ const CheckStatusPage = () => {
                         <div>
                             <h1 className="text-3xl font-bold text-slate-800">Check Status Details</h1>
                             <p className="text-slate-600 mt-2">
-                                {check.checkType} Verification for {caseData?.employeeName}
+                                <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-bold mr-2 ${check.checkType === 'EDUCATION' ? 'bg-purple-100 text-purple-800' :
+                                    check.checkType === 'CRIME' ? 'bg-orange-100 text-orange-800' :
+                                        check.checkType === 'EMPLOYMENT' ? 'bg-blue-100 text-blue-800' :
+                                            'bg-slate-100 text-slate-800'
+                                    }`}>
+                                    {check.checkType === 'EDUCATION' && '📚'}
+                                    {check.checkType === 'CRIME' && '🔍'}
+                                    {check.checkType === 'EMPLOYMENT' && '💼'}
+                                    {' '}{check.checkType} VERIFICATION
+                                </span>
+                                for <span className="font-semibold text-slate-800">{caseData?.employeeName}</span>
                             </p>
                         </div>
                     </div>
@@ -309,6 +368,7 @@ const CheckStatusPage = () => {
                                 </h2>
                                 <p className="text-lg mt-1">
                                     Risk Score: <span className="font-bold">{check.riskScore || 0}/100</span>
+                                    <span className="ml-2 text-sm opacity-75">({getRiskExplanation(check.riskScore || 0)})</span>
                                 </p>
                             </div>
                             <div className="text-right">
@@ -317,6 +377,43 @@ const CheckStatusPage = () => {
                             </div>
                         </div>
                     </div>
+
+                    {/* Error Alert - Show if any errors occurred */}
+                    {activityLogs.some(log =>
+                        log.action.includes('ERROR') ||
+                        log.action.includes('FAILED') ||
+                        log.description?.toLowerCase().includes('error') ||
+                        log.description?.toLowerCase().includes('failed')
+                    ) && (
+                            <div className="bg-red-50 border-2 border-red-300 rounded-xl p-6">
+                                <h3 className="text-lg font-bold text-red-800 flex items-center gap-2 mb-3">
+                                    ⚠️ Errors Detected During Verification
+                                </h3>
+                                <div className="space-y-2">
+                                    {activityLogs
+                                        .filter(log =>
+                                            log.action.includes('ERROR') ||
+                                            log.action.includes('FAILED') ||
+                                            log.description?.toLowerCase().includes('error') ||
+                                            log.description?.toLowerCase().includes('failed') ||
+                                            log.description?.toLowerCase().includes('insufficient')
+                                        )
+                                        .map(log => (
+                                            <div key={log.logId} className="bg-white border border-red-200 rounded-lg p-3">
+                                                <p className="font-semibold text-red-700">{log.action.replace(/_/g, ' ')}</p>
+                                                <p className="text-sm text-red-600 mt-1">{log.description}</p>
+                                                <p className="text-xs text-red-400 mt-1">
+                                                    {new Date(log.timestamp).toLocaleString()}
+                                                </p>
+                                            </div>
+                                        ))
+                                    }
+                                </div>
+                                <p className="text-sm text-red-600 mt-3">
+                                    💡 The check may have completed with errors. Please review the activity timeline below for details.
+                                </p>
+                            </div>
+                        )}
 
                     {/* Workflow Status */}
                     <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
@@ -346,22 +443,308 @@ const CheckStatusPage = () => {
                                 </div>
                             </div>
 
-                            {/* Step 2: Check Executed */}
+                            {/* Step 2: Check Executed - 3 Tier Verification */}
                             <div className="flex items-start gap-4">
                                 <div className={`w-10 h-10 rounded-full flex items-center justify-center ${check.status !== 'PENDING' ? 'bg-green-100 text-green-600' : 'bg-slate-100 text-slate-400'
                                     }`}>
                                     {check.status !== 'PENDING' ? '✓' : '2'}
                                 </div>
                                 <div className="flex-1">
-                                    <h4 className="font-semibold text-slate-800">Check Executed</h4>
+                                    <h4 className="font-semibold text-slate-800">Check Executed - 3-Tier Verification</h4>
                                     <p className="text-sm text-slate-600">
                                         Status: {getStatusIcon(check.status)} {check.status}
                                     </p>
                                     <p className="text-sm text-slate-600">
                                         AI Agent: {check.aiAgentStatus || 'NOT_STARTED'}
                                     </p>
+
+                                    {/* 3-Tier Verification Details */}
+                                    {check.status !== 'PENDING' && (
+                                        <div className="mt-3 space-y-2">
+                                            <details className="bg-slate-50 rounded-lg border border-slate-200">
+                                                <summary className="px-3 py-2 cursor-pointer text-sm font-medium text-slate-700 hover:bg-slate-100 rounded-lg">
+                                                    📋 View 3-Tier Verification Details
+                                                </summary>
+                                                <div className="px-3 pb-3 space-y-3">
+                                                    {/* Tier 1 */}
+                                                    <div className="bg-white p-3 rounded-lg border border-blue-100">
+                                                        <div className="flex items-center gap-2 mb-1">
+                                                            <span className="text-blue-600 font-bold">Tier 1</span>
+                                                            <span className="text-sm font-semibold text-slate-800">Document Analysis</span>
+                                                            <span className={`text-xs px-2 py-0.5 rounded-full ${tier1Data.found ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'}`}>
+                                                                {tier1Data.found ? '✓ Completed' : '○ Pending'}
+                                                            </span>
+                                                        </div>
+                                                        {tier1Data.found && tier1Data.description && (
+                                                            <p className="text-xs text-green-700 bg-green-50 p-2 rounded mb-2">
+                                                                📝 {tier1Data.description}
+                                                            </p>
+                                                        )}
+
+                                                        {/* Show extracted education data */}
+                                                        {(verificationData.degree || verificationData.institution || verificationData.year) && (
+                                                            <div className="bg-blue-50 p-2 rounded text-xs mb-2">
+                                                                <p className="font-medium text-blue-800">📄 Extracted Data:</p>
+                                                                <ul className="text-blue-700 ml-3 mt-1 space-y-0.5">
+                                                                    {verificationData.degree && <li>• Degree: <strong>{verificationData.degree}</strong></li>}
+                                                                    {verificationData.institution && <li>• Institution: <strong>{verificationData.institution}</strong></li>}
+                                                                    {verificationData.year && <li>• Year of Passing: <strong>{verificationData.year}</strong></li>}
+                                                                    {verificationData.grade && <li>• Grade/Percentage: <strong>{verificationData.grade}</strong></li>}
+                                                                </ul>
+                                                            </div>
+                                                        )}
+
+                                                        {/* Show detailed tier1 forensics from verificationData.tiers */}
+                                                        {verificationData.tiers?.tier1 && (
+                                                            <div className="bg-slate-50 p-2 rounded text-xs mb-2">
+                                                                <p className="font-medium text-slate-800">🔍 Analysis Details:</p>
+                                                                {verificationData.tiers.tier1.forensics && (
+                                                                    <div className="ml-2 mt-1">
+                                                                        <p className="text-slate-600">Forensics: <span className={verificationData.tiers.tier1.forensics.documentGenuine ? 'text-green-600' : 'text-red-600'}>
+                                                                            {verificationData.tiers.tier1.forensics.documentGenuine ? '✓ Document appears genuine' : '⚠ Issues detected'}
+                                                                        </span></p>
+                                                                        <p className="text-slate-500">Risk Score: {verificationData.tiers.tier1.forensics.riskScore || 0}</p>
+                                                                    </div>
+                                                                )}
+                                                                {verificationData.tiers.tier1.contentAnalysis && (
+                                                                    <div className="ml-2 mt-1">
+                                                                        <p className="text-slate-600">Content: <span className={verificationData.tiers.tier1.contentAnalysis.isValid ? 'text-green-600' : 'text-yellow-600'}>
+                                                                            {verificationData.tiers.tier1.contentAnalysis.isValid ? '✓ Valid content' : '⚠ Review needed'}
+                                                                        </span></p>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        )}
+
+                                                        <p className="text-xs text-slate-600">
+                                                            AI-powered analysis using Gemini Vision for data extraction and fraud detection.
+                                                        </p>
+                                                    </div>
+
+                                                    {/* Tier 2 */}
+                                                    <div className="bg-white p-3 rounded-lg border border-purple-100">
+                                                        <div className="flex items-center gap-2 mb-1">
+                                                            <span className="text-purple-600 font-bold">Tier 2</span>
+                                                            <span className="text-sm font-semibold text-slate-800">
+                                                                {check.checkType === 'EDUCATION' ? 'NAD/University Database' :
+                                                                    check.checkType === 'CRIME' ? 'Criminal Records Check' :
+                                                                        'Employment Database Check'}
+                                                            </span>
+                                                            <span className={`text-xs px-2 py-0.5 rounded-full ${tier2Data.found ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'}`}>
+                                                                {tier2Data.found ? '✓ Completed' : '○ Pending'}
+                                                            </span>
+                                                        </div>
+                                                        {tier2Data.found && tier2Data.description && (
+                                                            <p className="text-xs text-purple-700 bg-purple-50 p-2 rounded mb-2">
+                                                                🔍 {tier2Data.description}
+                                                            </p>
+                                                        )}
+
+                                                        {/* Show detailed NAD verification results */}
+                                                        {verificationData.tiers?.tier2 && (
+                                                            <div className="bg-purple-50 p-2 rounded text-xs mb-2">
+                                                                <p className="font-medium text-purple-800">📊 NAD Verification Details:</p>
+                                                                <ul className="text-purple-700 ml-3 mt-1 space-y-0.5">
+                                                                    <li>• Status: <strong>{verificationData.tiers.tier2.status}</strong></li>
+                                                                    <li>• Verified: <span className={verificationData.tiers.tier2.verified ? 'text-green-600 font-bold' : 'text-yellow-600'}>
+                                                                        {verificationData.tiers.tier2.verified ? '✓ Yes' : '○ No'}
+                                                                    </span></li>
+                                                                    {verificationData.tiers.tier2.apiMode && (
+                                                                        <li>• Mode: {verificationData.tiers.tier2.apiMode}</li>
+                                                                    )}
+                                                                    {verificationData.tiers.tier2.message && (
+                                                                        <li>• Message: {verificationData.tiers.tier2.message}</li>
+                                                                    )}
+                                                                </ul>
+                                                                {verificationData.tiers.tier2.data && (
+                                                                    <div className="mt-2 border-t border-purple-200 pt-2">
+                                                                        <p className="font-medium text-purple-800">Matched Records:</p>
+                                                                        <ul className="text-purple-700 ml-3 mt-1 space-y-0.5">
+                                                                            {verificationData.tiers.tier2.data.degree && <li>• Degree: {verificationData.tiers.tier2.data.degree}</li>}
+                                                                            {verificationData.tiers.tier2.data.institution && <li>• Institution: {verificationData.tiers.tier2.data.institution}</li>}
+                                                                            {verificationData.tiers.tier2.data.yearOfPassing && <li>• Year: {verificationData.tiers.tier2.data.yearOfPassing}</li>}
+                                                                        </ul>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        )}
+
+                                                        <p className="text-xs text-slate-600">
+                                                            {check.checkType === 'EDUCATION' ?
+                                                                'Cross-referencing with NAD (National Academic Depository) and university databases.' :
+                                                                check.checkType === 'CRIME' ?
+                                                                    'Searching court records, watchlists, and adverse media.' :
+                                                                    'Verification against EPFO records and employment databases.'}
+                                                        </p>
+                                                    </div>
+
+                                                    {/* Tier 3 */}
+                                                    <div className="bg-white p-3 rounded-lg border border-orange-100">
+                                                        <div className="flex items-center gap-2 mb-1">
+                                                            <span className="text-orange-600 font-bold">Tier 3</span>
+                                                            <span className="text-sm font-semibold text-slate-800">
+                                                                {check.checkType === 'EDUCATION' ? 'University Outreach' :
+                                                                    check.checkType === 'CRIME' ? 'Police Verification' :
+                                                                        'HR Outreach & Confirmation'}
+                                                            </span>
+                                                            {(check.checkType === 'EMPLOYMENT' || check.checkType === 'EDUCATION') ? (
+                                                                <span className={`text-xs px-2 py-0.5 rounded-full ${emailResponses.length > 0 ? 'bg-green-100 text-green-700' : (emails.length > 0 || tier3Data.found || educationEmailSent) ? 'bg-yellow-100 text-yellow-700' : 'bg-slate-100 text-slate-500'}`}>
+                                                                    {emailResponses.length > 0 ? '✓ Verified' : (emails.length > 0 || tier3Data.found || educationEmailSent) ? '⏳ Awaiting Response' : '○ Pending'}
+                                                                </span>
+                                                            ) : (
+                                                                <span className="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-full">✓ Completed</span>
+                                                            )}
+                                                        </div>
+                                                        {tier3Data.found && tier3Data.description && (
+                                                            <p className="text-xs text-orange-700 bg-orange-50 p-2 rounded mb-2">
+                                                                📧 {tier3Data.description}
+                                                            </p>
+                                                        )}
+                                                        {check.checkType === 'EDUCATION' && check.registrarEmail && (
+                                                            <p className="text-xs text-slate-700 bg-slate-50 p-2 rounded mb-2">
+                                                                <strong>Registrar Email:</strong> {check.registrarEmail}
+                                                            </p>
+                                                        )}
+                                                        {emails.length > 0 && (
+                                                            <div className="text-xs text-orange-700 bg-orange-50 p-2 rounded mb-2">
+                                                                <p className="font-medium">📩 Email Sent:</p>
+                                                                <p className="ml-2">To: {emails[0]?.to}</p>
+                                                                {emails[0]?.googleSheetsUrl && (
+                                                                    <a href={emails[0].googleSheetsUrl} target="_blank" rel="noopener noreferrer" className="ml-2 text-blue-600 underline">
+                                                                        View Google Sheet →
+                                                                    </a>
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                        <p className="text-xs text-slate-600">
+                                                            {check.checkType === 'EDUCATION' ?
+                                                                'Direct verification with university registrar via email for enrollment confirmation.' :
+                                                                check.checkType === 'CRIME' ?
+                                                                    'Local police verification and PCC analysis.' :
+                                                                    'Automated email outreach to HR with Google Sheets for structured response.'}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </details>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
+
+                            {/* Step 3: University Email Sent (Education only) */}
+                            {check.checkType === 'EDUCATION' && (
+                                <div className="flex items-start gap-4">
+                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${(emails.length > 0 || tier3Data.found) ? 'bg-green-100 text-green-600' : 'bg-slate-100 text-slate-400'}`}>
+                                        {(emails.length > 0 || tier3Data.found) ? '✓' : '3'}
+                                    </div>
+                                    <div className="flex-1">
+                                        <h4 className="font-semibold text-slate-800">🎓 University Email Outreach</h4>
+                                        {emails.length > 0 ? (
+                                            <div className="mt-2 space-y-3">
+                                                {emails.map(email => {
+                                                    const response = emailResponses.find(r => r.checkId === email.checkId);
+                                                    return (
+                                                        <div key={email.emailId} className="bg-purple-50 rounded-lg p-4 border border-purple-200">
+                                                            <div className="flex justify-between items-start mb-2">
+                                                                <div>
+                                                                    <p className="text-sm font-medium text-slate-800">📧 To: {email.to}</p>
+                                                                    <p className="text-xs text-slate-600">{email.subject}</p>
+                                                                    <p className="text-xs text-slate-500 mt-1">
+                                                                        Sent: {new Date(email.sentAt).toLocaleString()}
+                                                                    </p>
+                                                                </div>
+                                                                <span className={`text-xs px-2 py-1 rounded-full ${email.status === 'REPLIED' ? 'bg-emerald-100 text-emerald-700' :
+                                                                    email.status === 'OPENED' ? 'bg-purple-100 text-purple-700' :
+                                                                        email.status === 'DELIVERED' ? 'bg-green-100 text-green-700' :
+                                                                            'bg-blue-100 text-blue-700'
+                                                                    }`}>
+                                                                    {email.status}
+                                                                </span>
+                                                            </div>
+
+                                                            {/* Email Thread Link */}
+                                                            <div className="flex flex-wrap gap-4 mt-2">
+                                                                <Link
+                                                                    to={`/email-thread/${email.emailId}`}
+                                                                    className="text-xs text-purple-600 hover:text-purple-800 font-medium hover:underline"
+                                                                >
+                                                                    📧 View Full Email Thread →
+                                                                </Link>
+
+                                                                {/* Google Sheet Link */}
+                                                                {email.googleSheetsUrl && (
+                                                                    <a
+                                                                        href={email.googleSheetsUrl}
+                                                                        target="_blank"
+                                                                        rel="noopener noreferrer"
+                                                                        className="text-xs text-blue-600 hover:underline"
+                                                                    >
+                                                                        📊 View Verification Sheet →
+                                                                    </a>
+                                                                )}
+                                                            </div>
+
+                                                            {/* University Response */}
+                                                            {response && (
+                                                                <div className="mt-3 pt-3 border-t border-purple-300">
+                                                                    <div className="flex items-center gap-2 mb-2">
+                                                                        <span className="text-emerald-600 font-semibold text-sm">🎓 University Response Received</span>
+                                                                        <span className={`text-xs px-2 py-0.5 rounded-full ${response.verified ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                                                            {response.verified ? '✓ Verified' : '✗ Not Verified'}
+                                                                        </span>
+                                                                    </div>
+                                                                    <p className="text-xs text-slate-600">From: {response.hrEmail}</p>
+                                                                    <p className="text-xs text-slate-500">Responded: {new Date(response.respondedAt).toLocaleString()}</p>
+                                                                    <details className="mt-2">
+                                                                        <summary className="text-xs text-purple-600 cursor-pointer hover:underline">
+                                                                            View Response Data
+                                                                        </summary>
+                                                                        <pre className="mt-2 p-2 bg-white rounded text-xs text-slate-700 overflow-auto max-h-40">
+                                                                            {JSON.stringify(response.responseData, null, 2)}
+                                                                        </pre>
+                                                                    </details>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        ) : tier3Data.found ? (
+                                            <>
+                                                <p className="text-sm text-green-600">✓ Email sent to university registrar</p>
+                                                <p className="text-sm text-slate-600">To: {check.registrarEmail || 'University Registrar'}</p>
+                                                <p className="text-xs text-slate-500 mt-1">{tier3Data.description}</p>
+                                            </>
+                                        ) : (
+                                            <p className="text-sm text-slate-500">⏳ Awaiting university outreach</p>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Step 4: University Response Status (Education only) */}
+                            {check.checkType === 'EDUCATION' && (
+                                <div className="flex items-start gap-4">
+                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${emailResponses.length > 0 ? 'bg-green-100 text-green-600' : 'bg-slate-100 text-slate-400'}`}>
+                                        {emailResponses.length > 0 ? '✓' : '4'}
+                                    </div>
+                                    <div className="flex-1">
+                                        <h4 className="font-semibold text-slate-800">📋 University Response</h4>
+                                        {emailResponses.length > 0 ? (
+                                            <div className="bg-green-50 p-3 rounded-lg mt-2 border border-green-200">
+                                                <p className="text-sm font-medium text-green-800">
+                                                    Education Verified: {emailResponses[0].verified ? '✓ Confirmed' : '✗ Discrepancy Found'}
+                                                </p>
+                                                <p className="text-xs text-slate-600 mt-1">
+                                                    Responded at: {new Date(emailResponses[0].respondedAt).toLocaleString()}
+                                                </p>
+                                            </div>
+                                        ) : (
+                                            <p className="text-sm text-slate-500">⏳ Awaiting university response</p>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
 
                             {/* Step 3: Email Sent (Employment only) */}
                             {check.checkType === 'EMPLOYMENT' && (
@@ -742,7 +1125,7 @@ const CheckStatusPage = () => {
                     <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
                         <h3 className="text-xl font-semibold text-slate-800 mb-4">Actions</h3>
                         <div className="flex gap-3 flex-wrap">
-                            {check.status === 'PENDING' && (
+                            {(check.status === 'PENDING' || check.status === 'FAILED' || check.status === 'COMPLETED') && (
                                 <button
                                     type="button"
                                     onClick={() => {
@@ -758,14 +1141,20 @@ const CheckStatusPage = () => {
 
                                         axios.post(`/api/checks/${checkId}/execute`)
                                             .then(() => {
-                                                alert('Check executed!');
+                                                alert(check.status === 'FAILED' ? 'Check retry initiated!' : 'Check execution started!');
                                                 fetchCheckDetails();
                                             })
                                             .catch(() => alert('Failed to execute check'));
                                     }}
-                                    className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium cursor-pointer"
+                                    disabled={check.status === 'COMPLETED'}
+                                    className={`px-6 py-3 rounded-lg transition-colors font-medium ${check.status === 'FAILED'
+                                        ? 'bg-orange-600 text-white hover:bg-orange-700 cursor-pointer'
+                                        : check.status === 'COMPLETED'
+                                            ? 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed'
+                                            : 'bg-blue-600 text-white hover:bg-blue-700 cursor-pointer'
+                                        }`}
                                 >
-                                    Execute Check
+                                    {check.status === 'FAILED' ? '🔄 Retry Check' : check.status === 'COMPLETED' ? '✓ Completed' : 'Execute Check'}
                                 </button>
                             )}
                             <button
@@ -784,85 +1173,87 @@ const CheckStatusPage = () => {
                         </div>
                     </div>
                 </div>
-            </div>
+            </div >
 
             {/* Call HR Modal */}
-            {showCallModal && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md mx-4">
-                        <div className="flex justify-between items-center mb-4">
-                            <h3 className="text-xl font-semibold text-slate-800">📞 Call HR for Verification</h3>
-                            <button
-                                onClick={() => {
-                                    setShowCallModal(false);
-                                    setCallError(null);
-                                }}
-                                className="text-slate-400 hover:text-slate-600"
-                            >
-                                ✕
-                            </button>
-                        </div>
+            {
+                showCallModal && (
+                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                        <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md mx-4">
+                            <div className="flex justify-between items-center mb-4">
+                                <h3 className="text-xl font-semibold text-slate-800">📞 Call HR for Verification</h3>
+                                <button
+                                    onClick={() => {
+                                        setShowCallModal(false);
+                                        setCallError(null);
+                                    }}
+                                    className="text-slate-400 hover:text-slate-600"
+                                >
+                                    ✕
+                                </button>
+                            </div>
 
-                        <p className="text-sm text-slate-600 mb-4">
-                            Enter the HR phone number. Our AI will call and conduct a verification conversation automatically.
-                        </p>
-
-                        <div className="mb-4">
-                            <label className="block text-sm font-medium text-slate-700 mb-2">
-                                HR Phone Number
-                            </label>
-                            <input
-                                type="tel"
-                                value={hrPhone}
-                                onChange={(e) => setHrPhone(e.target.value)}
-                                placeholder="+91 9876543210"
-                                className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none"
-                            />
-                            <p className="text-xs text-slate-500 mt-1">Format: +91XXXXXXXXXX or country code + number</p>
-                            {callError && (
-                                <p className="text-xs text-red-600 mt-2">{callError}</p>
-                            )}
-                        </div>
-
-                        <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 mb-4">
-                            <p className="text-xs text-purple-800">
-                                <strong>What will happen:</strong><br />
-                                1. AI will call the HR number<br />
-                                2. Verify employee: {caseData?.employeeName}<br />
-                                3. Ask about employment dates, designation, exit type<br />
-                                4. Record responses in the system
+                            <p className="text-sm text-slate-600 mb-4">
+                                Enter the HR phone number. Our AI will call and conduct a verification conversation automatically.
                             </p>
-                        </div>
 
-                        <div className="flex gap-3">
-                            <button
-                                onClick={() => {
-                                    setShowCallModal(false);
-                                    setCallError(null);
-                                }}
-                                className="flex-1 px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={handleInitiateCall}
-                                disabled={callLoading}
-                                className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                            >
-                                {callLoading ? (
-                                    <>
-                                        <span className="animate-spin">⏳</span>
-                                        Calling...
-                                    </>
-                                ) : (
-                                    <>📞 Start Call</>
+                            <div className="mb-4">
+                                <label className="block text-sm font-medium text-slate-700 mb-2">
+                                    HR Phone Number
+                                </label>
+                                <input
+                                    type="tel"
+                                    value={hrPhone}
+                                    onChange={(e) => setHrPhone(e.target.value)}
+                                    placeholder="+91 9876543210"
+                                    className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none"
+                                />
+                                <p className="text-xs text-slate-500 mt-1">Format: +91XXXXXXXXXX or country code + number</p>
+                                {callError && (
+                                    <p className="text-xs text-red-600 mt-2">{callError}</p>
                                 )}
-                            </button>
+                            </div>
+
+                            <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 mb-4">
+                                <p className="text-xs text-purple-800">
+                                    <strong>What will happen:</strong><br />
+                                    1. AI will call the HR number<br />
+                                    2. Verify employee: {caseData?.employeeName}<br />
+                                    3. Ask about employment dates, designation, exit type<br />
+                                    4. Record responses in the system
+                                </p>
+                            </div>
+
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => {
+                                        setShowCallModal(false);
+                                        setCallError(null);
+                                    }}
+                                    className="flex-1 px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={handleInitiateCall}
+                                    disabled={callLoading}
+                                    className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                >
+                                    {callLoading ? (
+                                        <>
+                                            <span className="animate-spin">⏳</span>
+                                            Calling...
+                                        </>
+                                    ) : (
+                                        <>📞 Start Call</>
+                                    )}
+                                </button>
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
-        </div>
+                )
+            }
+        </div >
     );
 };
 

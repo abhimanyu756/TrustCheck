@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
-import Logo from '../components/Logo';
 import Breadcrumb from '../components/Breadcrumb';
+import Navbar from '../components/Navbar';
 
 interface Client {
     clientId: string;
@@ -45,11 +45,11 @@ const ClientDashboard = () => {
     }
 
     return (
-        <div className="min-h-screen bg-slate-50 py-8 px-4">
-            <div className="max-w-7xl mx-auto">
+        <div className="min-h-screen bg-white">
+            <Navbar />
+            <div className="max-w-7xl mx-auto py-8 px-4">
                 {/* Header */}
                 <div className="mb-8">
-                    <Logo />
                     <div className="mt-6">
                         <Breadcrumb items={[
                             { label: 'Home', path: '/' },

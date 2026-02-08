@@ -13,7 +13,7 @@ const {
 require('dotenv').config();
 
 const client = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-const MODEL_NAME = "gemini-2.5-flash";
+const MODEL_NAME = "gemini-3-flash-preview";
 
 async function createVerificationRequest(data) {
     const id = Math.random().toString(36).substring(7);

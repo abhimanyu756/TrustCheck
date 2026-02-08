@@ -659,11 +659,168 @@ async function sendPoliceVerificationEmail(policeEmail, candidateName, sheetUrl,
     }
 }
 
+/**
+ * Client Report Email Template
+ */
+const clientReportTemplate = `
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 700px; margin: 0 auto; padding: 20px; }
+        .header { background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+        .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
+        .summary-box { background: white; padding: 20px; border-radius: 8px; margin: 20px 0; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .green-zone { border-left: 4px solid #10b981; }
+        .red-zone { border-left: 4px solid #ef4444; }
+        .employee-list { margin: 10px 0; padding: 0; }
+        .employee-item { padding: 10px; margin: 5px 0; background: #f8f9fa; border-radius: 4px; }
+        .badge { display: inline-block; padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: bold; }
+        .badge-green { background: #d1fae5; color: #065f46; }
+        .badge-red { background: #fee2e2; color: #991b1b; }
+        .stats-grid { display: flex; gap: 15px; margin: 20px 0; }
+        .stat-card { flex: 1; text-align: center; padding: 15px; background: white; border-radius: 8px; }
+        .stat-number { font-size: 24px; font-weight: bold; }
+        .footer { text-align: center; color: #666; font-size: 12px; margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📋 Verification Report</h1>
+            <p>TrustCheck AI Background Verification</p>
+        </div>
+        <div class="content">
+            <p>Dear {{clientName}},</p>
+            
+            <p>Please find below the verification summary report for your organization.</p>
+            
+            <div class="stats-grid">
+                <div class="stat-card" style="border: 2px solid #10b981;">
+                    <div class="stat-number" style="color: #10b981;">{{greenCount}}</div>
+                    <div>Green Zone</div>
+                </div>
+                <div class="stat-card" style="border: 2px solid #ef4444;">
+                    <div class="stat-number" style="color: #ef4444;">{{redCount}}</div>
+                    <div>Red Zone</div>
+                </div>
+                <div class="stat-card" style="border: 2px solid #3b82f6;">
+                    <div class="stat-number" style="color: #3b82f6;">{{totalChecks}}</div>
+                    <div>Total Checks</div>
+                </div>
+            </div>
+
+            {{#if greenEmployees.length}}
+            <div class="summary-box green-zone">
+                <h3>✅ Green Zone - Good to Go</h3>
+                <p>The following employees have been verified successfully with low risk scores:</p>
+                <div class="employee-list">
+                    {{#each greenEmployees}}
+                    <div class="employee-item">
+                        <strong>{{this.employeeName}}</strong>
+                        <span class="badge badge-green">Verified</span>
+                        <br><small>Check: {{this.checkType}} | Risk Score: {{this.riskScore}}%</small>
+                    </div>
+                    {{/each}}
+                </div>
+            </div>
+            {{/if}}
+
+            {{#if redEmployees.length}}
+            <div class="summary-box red-zone">
+                <h3>⚠️ Red Zone - Requires Discussion</h3>
+                <p>The following employees require further discussion or review:</p>
+                <div class="employee-list">
+                    {{#each redEmployees}}
+                    <div class="employee-item">
+                        <strong>{{this.employeeName}}</strong>
+                        <span class="badge badge-red">Needs Review</span>
+                        <br><small>Check: {{this.checkType}} | Risk Score: {{this.riskScore}}%</small>
+                        {{#if this.reason}}<br><small>Reason: {{this.reason}}</small>{{/if}}
+                    </div>
+                    {{/each}}
+                </div>
+            </div>
+            {{/if}}
+
+            {{#if sheetUrl}}
+            <div style="margin: 25px 0; padding: 20px; background: linear-gradient(135deg, #4ade80 0%, #22c55e 100%); border-radius: 12px; text-align: center;">
+                <p style="color: white; font-size: 16px; margin: 0 0 15px 0; font-weight: bold;">📊 View Full Report in Google Sheets</p>
+                <a href="{{sheetUrl}}" style="display: inline-block; background: white; color: #16a34a; padding: 12px 30px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 14px;">Open Detailed Report →</a>
+            </div>
+            {{/if}}
+
+            <p>If you have any questions regarding this report, please feel free to reach out to our verification team.</p>
+            
+            <p>Best regards,<br><strong>TrustCheck AI Team</strong></p>
+        </div>
+        <div class="footer">
+            <p>This is an automated report from TrustCheck AI</p>
+            <p>Powered by Gemini AI | Report generated on {{reportDate}}</p>
+        </div>
+    </div>
+</body>
+</html>
+`;
+
+/**
+ * Send client verification report email
+ */
+async function sendClientReportEmail(clientEmail, clientName, reportData) {
+    try {
+        if (!transporter) {
+            initEmailService();
+        }
+
+        const { greenEmployees = [], redEmployees = [], totalChecks = 0, sheetUrl = null } = reportData;
+
+        const template = handlebars.compile(clientReportTemplate);
+        const html = template({
+            clientName,
+            greenEmployees,
+            redEmployees,
+            greenCount: greenEmployees.length,
+            redCount: redEmployees.length,
+            totalChecks,
+            sheetUrl,
+            reportDate: new Date().toLocaleDateString('en-US', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            })
+        });
+
+        const mailOptions = {
+            from: `"TrustCheck AI" <${process.env.EMAIL_USER}>`,
+            to: clientEmail,
+            subject: `Verification Report - ${greenEmployees.length} Approved, ${redEmployees.length} Require Review`,
+            html
+        };
+
+        if (!transporter) {
+            console.log('📧 [MOCK] Would send client report email to:', clientEmail);
+            console.log('📧 [MOCK] Subject:', mailOptions.subject);
+            return { success: true, isMock: true };
+        }
+
+        const info = await transporter.sendMail(mailOptions);
+        console.log(`📧 Client report email sent to ${clientEmail}: ${info.messageId}`);
+
+        return { success: true, messageId: info.messageId, isMock: false };
+    } catch (error) {
+        console.error('Error sending client report email:', error);
+        throw error;
+    }
+}
+
 module.exports = {
     initEmailService,
     sendVerificationEmail,
     sendReminderEmail,
     sendEscalationEmail,
     sendEducationVerificationEmail,
-    sendPoliceVerificationEmail
+    sendPoliceVerificationEmail,
+    sendClientReportEmail
 };

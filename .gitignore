@@ -29,3 +29,7 @@ dist-ssr
 *.tar
 deploy-server.sh
 .npmrc
+
+# Uploaded documents
+server/uploads/
+uploads/

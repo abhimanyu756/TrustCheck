@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import axios from 'axios';
 import Navbar from '../components/Navbar';
@@ -24,6 +24,8 @@ interface EmailResponse {
     verified: boolean;
 }
 
+
+
 const EmailInbox = () => {
     const { checkId } = useParams<{ checkId?: string }>();
     const [emails, setEmails] = useState<Email[]>([]);
@@ -31,6 +33,7 @@ const EmailInbox = () => {
     const [selectedEmail, setSelectedEmail] = useState<Email | null>(null);
     const [loading, setLoading] = useState(true);
     const [autoRefresh, setAutoRefresh] = useState(true);
+    const [filterType, setFilterType] = useState('ALL');
 
     useEffect(() => {
         fetchEmails();
@@ -95,15 +98,30 @@ const EmailInbox = () => {
         return responses.find(r => r.checkId === emailCheckId);
     };
 
+    const handleEmailSelect = (email: Email) => {
+        setSelectedEmail(email);
+        // Also find related check info if available
+        // In a real app we might need to fetch check details here
+    };
+
+    // Filter emails based on selection
+    const filteredEmails = emails.filter(email => {
+        if (filterType === 'ALL') return true;
+        if (filterType === 'EDUCATION') return email.checkId.includes('CHK_EDU');
+        if (filterType === 'EMPLOYMENT') return email.checkId.includes('CHK_EMP');
+        if (filterType === 'CRIME') return email.checkId.includes('CHK_CRM');
+        return true;
+    });
+
+    const isEducation = selectedEmail?.checkId.includes('CHK_EDU');
+    const responseLabel = isEducation ? 'University Response' : 'HR Response';
+
     if (loading) {
         return (
-            <div className="min-h-screen bg-slate-50">
-                <Navbar />
-                <div className="flex items-center justify-center" style={{ height: 'calc(100vh - 80px)' }}>
-                    <div className="text-center">
-                        <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent mx-auto"></div>
-                        <p className="mt-4 text-slate-600">Loading emails...</p>
-                    </div>
+            <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+                <div className="text-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent mx-auto"></div>
+                    <p className="mt-4 text-slate-600">Loading emails...</p>
                 </div>
             </div>
         );
@@ -111,19 +129,33 @@ const EmailInbox = () => {
 
     return (
         <div className="min-h-screen bg-slate-50">
-            <Navbar breadcrumbs={checkId ? [{ label: 'Email Inbox', path: '/emails' }, { label: `Check ${checkId}`, path: `/emails/${checkId}` }] : [{ label: 'Email Inbox', path: '/emails' }]} />
+            <Navbar breadcrumbs={[{ label: 'Email Inbox', path: '/emails' }]} />
 
             <div className="max-w-7xl mx-auto px-4 py-8">
                 {/* Header */}
-                <div className="mb-6 flex justify-between items-center">
+                <div className="mb-6 flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
                     <div>
+                        <div className="flex items-center gap-2 text-sm text-slate-500 mb-1">
+                            <Link to="/" className="hover:text-blue-600">Home</Link>
+                            <span>/</span>
+                            <span>Email Inbox</span>
+                        </div>
                         <h1 className="text-3xl font-bold text-slate-800">Email Inbox</h1>
-                        <p className="text-slate-600 mt-1">
-                            {checkId ? `Emails for Check ${checkId}` : 'All verification emails'}
-                        </p>
+                        <p className="text-slate-600">All verification emails</p>
                     </div>
-                    <div className="flex items-center gap-3">
-                        <label className="flex items-center gap-2 text-sm text-slate-600">
+                    <div className="flex items-center gap-4">
+                        <select
+                            value={filterType}
+                            onChange={(e) => setFilterType(e.target.value)}
+                            className="px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 bg-white"
+                        >
+                            <option value="ALL">All Emails</option>
+                            <option value="EDUCATION">🎓 Education Checks</option>
+                            <option value="EMPLOYMENT">💼 Employment Checks</option>
+                            <option value="CRIME">⚖️ Crime Checks</option>
+                        </select>
+
+                        <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer">
                             <input
                                 type="checkbox"
                                 checked={autoRefresh}
@@ -145,24 +177,24 @@ const EmailInbox = () => {
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
                     <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
                         <div className="text-sm text-slate-600 mb-1">Total Sent</div>
-                        <div className="text-2xl font-bold text-slate-800">{emails.length}</div>
+                        <div className="text-2xl font-bold text-slate-800">{filteredEmails.length}</div>
                     </div>
                     <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
                         <div className="text-sm text-slate-600 mb-1">Delivered</div>
                         <div className="text-2xl font-bold text-green-600">
-                            {emails.filter(e => e.status === 'DELIVERED' || e.status === 'OPENED' || e.status === 'REPLIED').length}
+                            {filteredEmails.filter(e => e.status === 'DELIVERED' || e.status === 'OPENED' || e.status === 'REPLIED').length}
                         </div>
                     </div>
                     <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
                         <div className="text-sm text-slate-600 mb-1">Opened</div>
                         <div className="text-2xl font-bold text-purple-600">
-                            {emails.filter(e => e.status === 'OPENED' || e.status === 'REPLIED').length}
+                            {filteredEmails.filter(e => e.status === 'OPENED' || e.status === 'REPLIED').length}
                         </div>
                     </div>
                     <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
                         <div className="text-sm text-slate-600 mb-1">Replied</div>
                         <div className="text-2xl font-bold text-emerald-600">
-                            {emails.filter(e => e.status === 'REPLIED').length}
+                            {filteredEmails.filter(e => e.status === 'REPLIED').length}
                         </div>
                     </div>
                 </div>
@@ -171,16 +203,16 @@ const EmailInbox = () => {
                     {/* Email List */}
                     <div className="lg:col-span-1 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                         <div className="p-4 border-b border-slate-200 bg-slate-50">
-                            <h2 className="font-semibold text-slate-800">Sent Emails ({emails.length})</h2>
+                            <h2 className="font-semibold text-slate-800">Sent Emails ({filteredEmails.length})</h2>
                         </div>
                         <div className="divide-y divide-slate-200 max-h-[600px] overflow-y-auto">
-                            {emails.length > 0 ? (
-                                emails.map(email => {
+                            {filteredEmails.length > 0 ? (
+                                filteredEmails.map(email => {
                                     const response = getResponseForEmail(email.checkId);
                                     return (
                                         <button
                                             key={email.emailId}
-                                            onClick={() => setSelectedEmail(email)}
+                                            onClick={() => handleEmailSelect(email)}
                                             className={`w-full text-left p-4 hover:bg-slate-50 transition-colors ${selectedEmail?.emailId === email.emailId ? 'bg-blue-50 border-l-4 border-blue-600' : ''
                                                 }`}
                                         >
@@ -274,7 +306,7 @@ const EmailInbox = () => {
                                 {getResponseForEmail(selectedEmail.checkId) && (
                                     <div className="p-6 border-t border-slate-200 bg-emerald-50">
                                         <h3 className="font-semibold text-emerald-800 mb-3 flex items-center gap-2">
-                                            <span>💬</span> HR Response Received
+                                            <span>💬</span> {responseLabel} Received
                                         </h3>
                                         <div className="bg-white rounded-lg p-4">
                                             <div className="space-y-2 text-sm mb-4">

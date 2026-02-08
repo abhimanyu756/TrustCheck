@@ -78,8 +78,8 @@ async function buildEmailCheckMapping() {
                     const { getActivityLogs } = require('./database');
                     const logs = await getActivityLogs('check', check.checkId);
 
-                    // Find EMAIL_SENT activities
-                    const emailLogs = logs.filter(log => log.action === 'EMAIL_SENT');
+                    // Find EMAIL_SENT activities of all types
+                    const emailLogs = logs.filter(log => ['EMAIL_SENT', 'EDUCATION_EMAIL_SENT', 'POLICE_EMAIL_SENT'].includes(log.action));
 
                     for (const emailLog of emailLogs) {
                         const metadata = typeof emailLog.metadata === 'string'

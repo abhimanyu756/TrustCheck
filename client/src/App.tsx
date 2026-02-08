@@ -287,6 +287,7 @@ function App() {
           <Route path="/zones/comparison/:checkId" element={<ComparisonDetailsView />} />
           <Route path="/cases/:caseId/extracted-data" element={<ExtractedDataView />} />
           <Route path="/check/:checkId/call-transcript" element={<CallTranscriptPage />} />
+          <Route path="/call-transcript/:checkId" element={<CallTranscriptPage />} />
         </Routes>
       </BrowserRouter>
     </ToastProvider>

@@ -12,13 +12,19 @@ router.get('/all', async (req, res) => {
         const logs = await getActivityLogs('check', null);
 
         const emails = logs
-            .filter(log => log.action === 'EMAIL_SENT')
+            .filter(log => ['EMAIL_SENT', 'EDUCATION_EMAIL_SENT', 'POLICE_EMAIL_SENT'].includes(log.action))
             .map(log => {
                 const metadata = JSON.parse(log.metadata || '{}');
+
+                // Determine recipient based on email type
+                let to = metadata.hrEmail;
+                if (!to && metadata.registrarEmail) to = metadata.registrarEmail;
+                if (!to && metadata.policeEmail) to = metadata.policeEmail;
+
                 return {
                     emailId: log.logId,
                     checkId: log.entityId,
-                    to: metadata.hrEmail || 'N/A',
+                    to: to || 'N/A',
                     from: 'noreply@trustcheck.ai',
                     subject: metadata.subject || 'Employment Verification Request',
                     body: metadata.emailBody || '',
@@ -45,7 +51,7 @@ router.get('/check/:checkId', async (req, res) => {
         const logs = await getActivityLogs('check', checkId);
 
         const emails = logs
-            .filter(log => log.action === 'EMAIL_SENT')
+            .filter(log => ['EMAIL_SENT', 'EDUCATION_EMAIL_SENT', 'POLICE_EMAIL_SENT'].includes(log.action))
             .map(log => {
                 // Parse metadata - it might be a string or object
                 let metadata = {};
@@ -60,10 +66,15 @@ router.get('/check/:checkId', async (req, res) => {
                     metadata = log.metadata || {};
                 }
 
+                // Determine recipient based on email type
+                let to = metadata.hrEmail;
+                if (!to && metadata.registrarEmail) to = metadata.registrarEmail;
+                if (!to && metadata.policeEmail) to = metadata.policeEmail;
+
                 return {
                     emailId: log.logId,
                     checkId: log.entityId,
-                    to: metadata.hrEmail || 'N/A',
+                    to: to || 'N/A',
                     from: 'noreply@trustcheck.ai',
                     subject: metadata.subject || 'Employment Verification Request',
                     body: metadata.emailBody || '',

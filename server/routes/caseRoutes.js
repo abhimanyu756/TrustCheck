@@ -16,12 +16,18 @@ const { getChecksByCase } = require('../services/database');
  */
 router.post('/', async (req, res) => {
     try {
-        const { clientId, employeeData, previousEmployments } = req.body;
-        const result = await createCase(clientId, employeeData, previousEmployments);
-        res.json(result);
+        console.log('Received case creation request:', JSON.stringify(req.body, null, 2));
+        const { clientId, employeeData, previousEmployments, educationData, selectedChecks } = req.body;
+        console.log('Extracted selectedChecks:', selectedChecks);
+
+        const newCase = await createCase(clientId, employeeData, previousEmployments, educationData, selectedChecks);
+        console.log('Case created successfully:', newCase.caseId);
+
+        res.status(201).json(newCase);
     } catch (error) {
-        console.error('Error creating case:', error);
-        res.status(500).json({ error: 'Failed to create case' });
+        console.error('Error in POST /api/cases:', error);
+        console.error('Stack trace:', error.stack);
+        res.status(500).json({ error: error.message, stack: error.stack });
     }
 });
 

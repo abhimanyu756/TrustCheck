@@ -9,15 +9,19 @@ const {
 /**
  * Create a new case with auto-generated checks
  */
-async function createCase(clientId, employeeData, previousEmployments = []) {
+const createCase = async (clientId, employeeData, previousEmployments, educationData, selectedChecks) => {
     try {
-        const result = await saveCase(clientId, employeeData, previousEmployments);
-        return result;
+        console.log(`Creating case for client ${clientId}, employee: ${employeeData.employeeName}`);
+
+        // Save case to database and create checks
+        const newCase = await saveCase(clientId, employeeData, previousEmployments, educationData, selectedChecks);
+
+        return newCase;
     } catch (error) {
-        console.error('Error creating case:', error);
+        console.error('Error in createCase service:', error);
         throw error;
     }
-}
+};
 
 /**
  * Get case by ID with all checks

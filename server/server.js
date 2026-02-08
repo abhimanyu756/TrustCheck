@@ -24,6 +24,7 @@ const activityLogRoutes = require('./routes/activityLogRoutes');
 const emailRoutes = require('./routes/emailRoutes');
 const zoneRoutes = require('./routes/zoneRoutes');
 const callRoutes = require('./routes/callRoutes');
+const clientReportRoutes = require('./routes/clientReportRoutes');
 
 app.use(cors());
 app.use(express.json());
@@ -63,6 +64,7 @@ app.use('/api/activity-logs', activityLogRoutes);
 app.use('/api/emails', emailRoutes);
 app.use('/api/zones', zoneRoutes);
 app.use('/api/calls', callRoutes);
+app.use('/api/reports', clientReportRoutes);
 
 // Initialize all services, then start server
 Promise.all([

@@ -577,11 +577,288 @@ const createPoliceVerificationSheet = async (candidateData, requestId) => {
     }
 };
 
+/**
+ * Create a comprehensive client report sheet with employee verification summary
+ * Includes dashboard, detailed checks, and charts
+ */
+const createClientReportSheet = async (clientName, reportData) => {
+    try {
+        // Mock mode if not configured
+        if (!sheets) {
+            console.log('📝 MOCK: Creating Client Report Sheet for', clientName);
+            return {
+                spreadsheetId: `mock_report_${Date.now()}`,
+                spreadsheetUrl: `https://docs.google.com/spreadsheets/d/mock_report_${Date.now()}`,
+                isMock: true
+            };
+        }
+
+        const { greenEmployees = [], redEmployees = [], totalChecks = 0 } = reportData;
+        const reportDate = new Date().toISOString().split('T')[0];
+
+        // Safety check for division
+        const safeTotal = totalChecks || 1;
+        const calcPercent = (count) => Math.round((count / safeTotal) * 100) || 0;
+
+        // Create new spreadsheet with multiple sheets
+        const createResponse = await sheets.spreadsheets.create({
+            requestBody: {
+                properties: {
+                    title: `TrustCheck Report - ${clientName} - ${reportDate}`,
+                },
+                sheets: [
+                    {
+                        properties: {
+                            title: 'Summary Dashboard',
+                            sheetId: 0,
+                            gridProperties: { frozenRowCount: 1 }
+                        }
+                    },
+                    {
+                        properties: {
+                            title: 'Green Zone (Approved)',
+                            sheetId: 1,
+                            gridProperties: { frozenRowCount: 1 }
+                        }
+                    },
+                    {
+                        properties: {
+                            title: 'Red Zone (Needs Review)',
+                            sheetId: 2,
+                            gridProperties: { frozenRowCount: 1 }
+                        }
+                    },
+                    {
+                        properties: {
+                            title: 'All Checks Detail',
+                            sheetId: 3,
+                            gridProperties: { frozenRowCount: 1 }
+                        }
+                    }
+                ]
+            },
+        });
+
+        const spreadsheetId = createResponse.data.spreadsheetId;
+
+        // ========== SUMMARY DASHBOARD SHEET ==========
+        const summaryData = [
+            ['🏢 TrustCheck Verification Report'],
+            [''],
+            ['Client Name', clientName],
+            ['Report Generated', new Date().toLocaleString()],
+            [''],
+            ['📊 SUMMARY STATISTICS'],
+            ['Metric', 'Count', 'Percentage'],
+            ['Total Checks', totalChecks, '100%'],
+            ['✅ Green Zone (Approved)', greenEmployees.length, `${calcPercent(greenEmployees.length)}%`],
+            ['⚠️ Red Zone (Needs Review)', redEmployees.length, `${calcPercent(redEmployees.length)}%`],
+            ['⏳ Pending Review', totalChecks - greenEmployees.length - redEmployees.length, `${calcPercent(totalChecks - greenEmployees.length - redEmployees.length)}%`],
+            [''],
+            ['📈 ZONE BREAKDOWN BY CHECK TYPE'],
+            ['Check Type', 'Green Zone', 'Red Zone', 'Total'],
+        ];
+
+        // Calculate breakdown by check type
+        const checkTypes = ['EMPLOYMENT', 'EDUCATION', 'CRIME'];
+        checkTypes.forEach(type => {
+            const greenCount = greenEmployees.filter(e => e.checkType === type).length;
+            const redCount = redEmployees.filter(e => e.checkType === type).length;
+            summaryData.push([type, greenCount, redCount, greenCount + redCount]);
+        });
+
+        summaryData.push(['']);
+        summaryData.push(['📝 NOTES']);
+        summaryData.push(['Green Zone: Verification completed with no concerns. Safe to proceed with hiring.']);
+        summaryData.push(['Red Zone: Requires manual review before proceeding. Discrepancies or concerns detected.']);
+
+        await sheets.spreadsheets.values.update({
+            spreadsheetId,
+            range: 'Summary Dashboard!A1:D25',
+            valueInputOption: 'RAW',
+            requestBody: { values: summaryData },
+        });
+
+        // ========== GREEN ZONE SHEET ==========
+        const greenHeaders = ['#', 'Employee Name', 'Check Type', 'Risk Score', 'Status', 'Comments'];
+        const greenData = [greenHeaders];
+        greenEmployees.forEach((emp, idx) => {
+            greenData.push([
+                idx + 1,
+                emp.employeeName,
+                emp.checkType,
+                `${emp.riskScore || 0}%`,
+                emp.status || 'COMPLETED',
+                '✅ Verified - Safe to proceed'
+            ]);
+        });
+        if (greenEmployees.length === 0) {
+            greenData.push(['', 'No employees in Green Zone', '', '', '', '']);
+        }
+
+        await sheets.spreadsheets.values.update({
+            spreadsheetId,
+            range: 'Green Zone (Approved)!A1:F100',
+            valueInputOption: 'RAW',
+            requestBody: { values: greenData },
+        });
+
+        // ========== RED ZONE SHEET ==========
+        const redHeaders = ['#', 'Employee Name', 'Check Type', 'Risk Score', 'Status', 'Reason/Action Required'];
+        const redData = [redHeaders];
+        redEmployees.forEach((emp, idx) => {
+            redData.push([
+                idx + 1,
+                emp.employeeName,
+                emp.checkType,
+                `${emp.riskScore || 0}%`,
+                emp.status || 'NEEDS_REVIEW',
+                emp.reason || '⚠️ Manual review required - Please contact HR'
+            ]);
+        });
+        if (redEmployees.length === 0) {
+            redData.push(['', 'No employees in Red Zone', '', '', '', '']);
+        }
+
+        await sheets.spreadsheets.values.update({
+            spreadsheetId,
+            range: 'Red Zone (Needs Review)!A1:F100',
+            valueInputOption: 'RAW',
+            requestBody: { values: redData },
+        });
+
+        // ========== ALL CHECKS DETAIL SHEET ==========
+        const allHeaders = ['#', 'Employee Name', 'Check Type', 'Zone', 'Risk Score', 'Status', 'Verified Date', 'Notes'];
+        const allData = [allHeaders];
+        let idx = 1;
+
+        [...greenEmployees, ...redEmployees].forEach((emp) => {
+            const zone = greenEmployees.includes(emp) ? 'GREEN' : 'RED';
+            allData.push([
+                idx++,
+                emp.employeeName,
+                emp.checkType,
+                zone,
+                `${emp.riskScore || 0}%`,
+                emp.status || 'COMPLETED',
+                new Date().toLocaleDateString(),
+                zone === 'GREEN' ? 'Verified successfully' : 'Requires review'
+            ]);
+        });
+
+        await sheets.spreadsheets.values.update({
+            spreadsheetId,
+            range: 'All Checks Detail!A1:H200',
+            valueInputOption: 'RAW',
+            requestBody: { values: allData },
+        });
+
+        // ========== APPLY FORMATTING ==========
+        await sheets.spreadsheets.batchUpdate({
+            spreadsheetId,
+            requestBody: {
+                requests: [
+                    // Summary Dashboard - Title formatting
+                    {
+                        repeatCell: {
+                            range: { sheetId: 0, startRowIndex: 0, endRowIndex: 1 },
+                            cell: {
+                                userEnteredFormat: {
+                                    backgroundColor: { red: 0.2, green: 0.4, blue: 0.8 },
+                                    textFormat: { bold: true, fontSize: 18, foregroundColor: { red: 1, green: 1, blue: 1 } },
+                                }
+                            },
+                            fields: 'userEnteredFormat(backgroundColor,textFormat)',
+                        }
+                    },
+                    // Green Zone - Header formatting
+                    {
+                        repeatCell: {
+                            range: { sheetId: 1, startRowIndex: 0, endRowIndex: 1 },
+                            cell: {
+                                userEnteredFormat: {
+                                    backgroundColor: { red: 0.2, green: 0.7, blue: 0.3 },
+                                    textFormat: { bold: true, foregroundColor: { red: 1, green: 1, blue: 1 } },
+                                    horizontalAlignment: 'CENTER'
+                                }
+                            },
+                            fields: 'userEnteredFormat(backgroundColor,textFormat,horizontalAlignment)',
+                        }
+                    },
+                    // Red Zone - Header formatting
+                    {
+                        repeatCell: {
+                            range: { sheetId: 2, startRowIndex: 0, endRowIndex: 1 },
+                            cell: {
+                                userEnteredFormat: {
+                                    backgroundColor: { red: 0.9, green: 0.2, blue: 0.2 },
+                                    textFormat: { bold: true, foregroundColor: { red: 1, green: 1, blue: 1 } },
+                                    horizontalAlignment: 'CENTER'
+                                }
+                            },
+                            fields: 'userEnteredFormat(backgroundColor,textFormat,horizontalAlignment)',
+                        }
+                    },
+                    // All Checks Detail - Header formatting
+                    {
+                        repeatCell: {
+                            range: { sheetId: 3, startRowIndex: 0, endRowIndex: 1 },
+                            cell: {
+                                userEnteredFormat: {
+                                    backgroundColor: { red: 0.3, green: 0.5, blue: 0.7 },
+                                    textFormat: { bold: true, foregroundColor: { red: 1, green: 1, blue: 1 } },
+                                    horizontalAlignment: 'CENTER'
+                                }
+                            },
+                            fields: 'userEnteredFormat(backgroundColor,textFormat,horizontalAlignment)',
+                        }
+                    },
+                    // Auto-resize all columns
+                    ...([0, 1, 2, 3].map(sheetId => ({
+                        autoResizeDimensions: {
+                            dimensions: {
+                                sheetId: sheetId,
+                                dimension: 'COLUMNS',
+                                startIndex: 0,
+                                endIndex: 8,
+                            }
+                        }
+                    })))
+                ]
+            }
+        });
+
+        // Make sheet publicly viewable (read-only)
+        await drive.permissions.create({
+            fileId: spreadsheetId,
+            requestBody: {
+                role: 'reader',
+                type: 'anyone',
+            },
+        });
+
+        const spreadsheetUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`;
+
+        console.log(`✅ Created client report sheet: ${spreadsheetUrl}`);
+
+        return {
+            spreadsheetId,
+            spreadsheetUrl,
+            isMock: false
+        };
+
+    } catch (error) {
+        console.error('Error creating client report sheet:', error.message);
+        throw error;
+    }
+};
+
 module.exports = {
     initGoogleSheets,
     createVerificationSheet,
     createEducationVerificationSheet,
     createPoliceVerificationSheet,
+    createClientReportSheet,
     getSheetResponses,
     hasHRResponded
 };

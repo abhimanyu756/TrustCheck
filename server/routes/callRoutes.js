@@ -170,10 +170,12 @@ router.post('/webhook/gather', async (req, res) => {
         res.type('text/xml');
         res.send(twiml);
     } catch (error) {
-        console.error('Error handling gather webhook:', error);
+        console.error('❌ ERROR in gather webhook:', error.message);
+        console.error('❌ Stack trace:', error.stack);
+        console.error('❌ Full error:', JSON.stringify(error, null, 2));
         const twilio = require('twilio');
         const twiml = new twilio.twiml.VoiceResponse();
-        twiml.say('Sorry, there was an error. Goodbye.');
+        twiml.say({ voice: 'Polly.Aditi', language: 'en-IN' }, `Sorry, there was an error: ${error.message || 'unknown'}. Goodbye.`);
         twiml.hangup();
         res.type('text/xml');
         res.send(twiml.toString());
@@ -407,10 +409,12 @@ router.post('/webhook/speech', async (req, res) => {
         res.type('text/xml');
         res.send(twiml.toString());
     } catch (error) {
-        console.error('Error handling speech webhook:', error);
+        console.error('❌ ERROR in speech webhook:', error.message);
+        console.error('❌ Stack trace:', error.stack);
+        console.error('❌ Full error:', JSON.stringify(error, null, 2));
         const twilio = require('twilio');
         const twiml = new twilio.twiml.VoiceResponse();
-        twiml.say('Sorry, there was an error. Goodbye.');
+        twiml.say({ voice: 'Polly.Aditi', language: 'en-IN' }, `Sorry, there was an error: ${error.message || 'unknown'}. Goodbye.`);
         twiml.hangup();
         res.type('text/xml');
         res.send(twiml.toString());

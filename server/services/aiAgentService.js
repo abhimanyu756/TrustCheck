@@ -2,7 +2,7 @@ const { GoogleGenAI } = require("@google/genai");
 require('dotenv').config();
 
 const client = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-const MODEL_NAME = "gemini-2.5-flash";
+const MODEL_NAME = "gemini-3-flash-preview";
 
 /**
  * Main function to execute check based on type
@@ -172,15 +172,15 @@ async function executeEducationCheck(check) {
                 const crossRefResult = crossReferenceData(extractedData, nadResult.data);
                 verificationResult.discrepancies = crossRefResult.discrepancies;
 
-                // Calculate final risk based on NAD + documents
-                const finalRisk = calculateFinalRisk(
+                // Calculate risk based on NAD + documents
+                const nadRisk = calculateFinalRisk(
                     verificationResult.tier1,
                     verificationResult.tier2,
                     crossRefResult
                 );
 
-                verificationResult.riskScore = finalRisk.score;
-                verificationResult.riskLevel = finalRisk.level;
+                verificationResult.riskScore = nadRisk.score;
+                verificationResult.riskLevel = nadRisk.level;
                 verificationResult.notes = `Education verified via NAD (${nadAvailability.mode}). ${crossRefResult.discrepancies.length} discrepancies found.`;
 
                 // Log Tier 2 success
@@ -189,8 +189,8 @@ async function executeEducationCheck(check) {
                     verificationResult.tier2
                 );
 
-                // Return complete result - no need for Tier 3
-                return buildFinalResult(verificationResult, extractedData, 'NAD_VERIFIED');
+                // ALWAYS proceed to Tier 3 for university email confirmation
+                // (Don't return early - continue to Tier 3 below)
 
             } else {
                 console.log('   ⚠️ NAD Verification: No matching records');
@@ -294,10 +294,34 @@ Return JSON with:
             model: MODEL_NAME,
             contents: [prompt]
         });
-        const jsonMatch = result.text.match(/\{[\s\S]*\}/);
-        return jsonMatch ? JSON.parse(jsonMatch[0]) : {};
+        const responseText = typeof result.text === 'function' ? result.text() : result.text;
+
+        // Clean the response - remove markdown code blocks if present
+        let cleanText = responseText
+            .replace(/```json\s*/gi, '')
+            .replace(/```\s*/g, '')
+            .trim();
+
+        // Try to find and parse valid JSON object
+        const jsonStart = cleanText.indexOf('{');
+        const jsonEnd = cleanText.lastIndexOf('}');
+
+        if (jsonStart !== -1 && jsonEnd !== -1 && jsonEnd > jsonStart) {
+            const jsonStr = cleanText.substring(jsonStart, jsonEnd + 1);
+            try {
+                return JSON.parse(jsonStr);
+            } catch (parseErr) {
+                console.error('JSON parse failed, trying fallback:', parseErr.message);
+                console.error('Raw response:', responseText.substring(0, 500));
+                // Return empty object instead of throwing
+                return {};
+            }
+        }
+
+        return {};
     } catch (e) {
         console.error('AI extraction error:', e.message);
+        // Return empty object instead of throwing to allow check to continue
         return {};
     }
 }

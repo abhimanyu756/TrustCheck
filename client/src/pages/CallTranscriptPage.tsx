@@ -10,14 +10,39 @@ interface TranscriptEntry {
     timestamp: string;
 }
 
+interface AnalysisData {
+    interpretedResponses?: Record<string, string>;
+    discrepancies?: Array<{
+        field: string;
+        claimed: string;
+        hrStated: string;
+        severity: string;
+    }>;
+    riskScore?: number;
+    riskLevel?: string;
+    summary?: string;
+}
+
 interface CallData {
     callSid?: string;
     hrPhone?: string;
     employeeName?: string;
     responses?: Record<string, string>;
+    rawResponses?: Record<string, string>;
+    interpretedResponses?: Record<string, string>;
     conversation?: TranscriptEntry[];
     duration?: string;
     status?: string;
+    analysis?: AnalysisData;
+    riskScore?: number;
+    riskLevel?: string;
+    summary?: string;
+    discrepancies?: Array<{
+        field: string;
+        claimed: string;
+        hrStated: string;
+        severity: string;
+    }>;
 }
 
 const CallTranscriptPage = () => {
@@ -67,6 +92,27 @@ const CallTranscriptPage = () => {
         designationConfirmed: 'Was the designation correct?',
         exitVoluntary: 'Was their exit voluntary?',
         rehireEligible: 'Would you consider re-hiring them?'
+    };
+
+    const getResponseBadge = (value: string) => {
+        const upper = (value || '').toUpperCase();
+        if (upper === 'YES' || upper.includes('YES')) {
+            return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700">✓ Yes</span>;
+        } else if (upper === 'NO' || upper.includes('NO')) {
+            return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-700">✗ No</span>;
+        } else {
+            return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-700">? Unclear</span>;
+        }
+    };
+
+    const getRiskBadge = (riskLevel: string, riskScore?: number) => {
+        if (riskLevel === 'GREEN_ZONE') {
+            return <span className="px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-700">🟢 Green Zone {riskScore !== undefined ? `(${riskScore}/100)` : ''}</span>;
+        } else if (riskLevel === 'RED_ZONE') {
+            return <span className="px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-700">🔴 Red Zone {riskScore !== undefined ? `(${riskScore}/100)` : ''}</span>;
+        } else {
+            return <span className="px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-700">🟡 Yellow Zone {riskScore !== undefined ? `(${riskScore}/100)` : ''}</span>;
+        }
     };
 
     if (loading) {
@@ -157,31 +203,51 @@ const CallTranscriptPage = () => {
                             </div>
                         </div>
 
-                        {/* Responses Table */}
-                        {callData.responses && Object.keys(callData.responses).length > 0 && (
+                        {/* AI Analysis Summary */}
+                        {(callData.riskLevel || callData.analysis?.riskLevel) && (
+                            <div className="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-xl shadow-sm border border-purple-200 p-6">
+                                <h2 className="text-xl font-semibold text-slate-800 mb-4">🤖 AI Analysis Summary</h2>
+                                <div className="space-y-4">
+                                    <div className="flex items-center gap-4">
+                                        <span className="font-medium text-slate-600">Risk Assessment:</span>
+                                        {getRiskBadge(
+                                            callData.riskLevel || callData.analysis?.riskLevel || 'YELLOW_ZONE',
+                                            callData.riskScore || callData.analysis?.riskScore
+                                        )}
+                                    </div>
+                                    {(callData.summary || callData.analysis?.summary) && (
+                                        <div className="bg-white rounded-lg p-4 border border-purple-100">
+                                            <p className="text-slate-700 italic">"{callData.summary || callData.analysis?.summary}"</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Interpreted Responses Table */}
+                        {(callData.interpretedResponses || callData.analysis?.interpretedResponses) && (
                             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-                                <h2 className="text-xl font-semibold text-slate-800 mb-4">✅ Verification Responses</h2>
+                                <h2 className="text-xl font-semibold text-slate-800 mb-4">✅ Verification Responses (AI Interpreted)</h2>
                                 <div className="overflow-hidden rounded-lg border border-slate-200">
                                     <table className="min-w-full divide-y divide-slate-200">
                                         <thead className="bg-slate-50">
                                             <tr>
                                                 <th className="px-4 py-3 text-left text-sm font-semibold text-slate-700">Question</th>
-                                                <th className="px-4 py-3 text-left text-sm font-semibold text-slate-700 w-24">Response</th>
+                                                <th className="px-4 py-3 text-left text-sm font-semibold text-slate-700 w-32">AI Interpreted</th>
+                                                <th className="px-4 py-3 text-left text-sm font-semibold text-slate-700">Raw Response</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-100">
-                                            {Object.entries(callData.responses).map(([key, value]) => (
+                                            {Object.entries(callData.interpretedResponses || callData.analysis?.interpretedResponses || {}).map(([key, value]) => (
                                                 <tr key={key}>
                                                     <td className="px-4 py-3 text-sm text-slate-700">
                                                         {questionLabels[key] || key}
                                                     </td>
                                                     <td className="px-4 py-3 text-sm">
-                                                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${value === 'Yes'
-                                                            ? 'bg-green-100 text-green-700'
-                                                            : 'bg-red-100 text-red-700'
-                                                            }`}>
-                                                            {value === 'Yes' ? '✓ Yes' : '✗ No'}
-                                                        </span>
+                                                        {getResponseBadge(value)}
+                                                    </td>
+                                                    <td className="px-4 py-3 text-sm text-slate-500 italic">
+                                                        "{callData.rawResponses?.[key] || callData.responses?.[key] || '-'}"
                                                     </td>
                                                 </tr>
                                             ))}
@@ -191,36 +257,99 @@ const CallTranscriptPage = () => {
                             </div>
                         )}
 
-                        {/* Full Transcript */}
-                        {callData.conversation && callData.conversation.length > 0 && (
-                            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-                                <h2 className="text-xl font-semibold text-slate-800 mb-4">💬 Full Conversation</h2>
-                                <div className="space-y-4">
-                                    {callData.conversation.map((entry, index) => (
-                                        <div key={index} className="flex gap-4">
-                                            <div className="flex-shrink-0">
-                                                <div className="w-8 h-8 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center text-sm font-medium">
-                                                    {index + 1}
+                        {/* Discrepancies Section */}
+                        {((callData.discrepancies && callData.discrepancies.length > 0) ||
+                            (callData.analysis?.discrepancies && callData.analysis.discrepancies.length > 0)) && (
+                                <div className="bg-red-50 rounded-xl shadow-sm border border-red-200 p-6">
+                                    <h2 className="text-xl font-semibold text-red-800 mb-4">⚠️ Discrepancies Found</h2>
+                                    <div className="space-y-3">
+                                        {(callData.discrepancies || callData.analysis?.discrepancies || []).map((disc, idx) => (
+                                            <div key={idx} className="bg-white rounded-lg p-4 border border-red-100">
+                                                <div className="flex items-center justify-between mb-2">
+                                                    <span className="font-semibold text-slate-700">{disc.field}</span>
+                                                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${disc.severity === 'HIGH' ? 'bg-red-100 text-red-700' :
+                                                        disc.severity === 'MEDIUM' ? 'bg-yellow-100 text-yellow-700' :
+                                                            'bg-blue-100 text-blue-700'
+                                                        }`}>{disc.severity}</span>
+                                                </div>
+                                                <div className="grid grid-cols-2 gap-4 text-sm">
+                                                    <div>
+                                                        <span className="text-slate-500">Candidate Claimed:</span>
+                                                        <p className="text-slate-700">{disc.claimed}</p>
+                                                    </div>
+                                                    <div>
+                                                        <span className="text-slate-500">HR Stated:</span>
+                                                        <p className="text-slate-700">{disc.hrStated}</p>
+                                                    </div>
                                                 </div>
                                             </div>
-                                            <div className="flex-1 space-y-2">
-                                                <div className="bg-purple-50 border border-purple-200 rounded-lg p-3">
-                                                    <p className="text-xs text-purple-600 font-medium">🤖 TrustCheck AI</p>
-                                                    <p className="text-sm text-slate-700 mt-1">{entry.question}</p>
-                                                </div>
-                                                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                                                    <p className="text-xs text-blue-600 font-medium">👤 HR Response</p>
-                                                    <p className="text-sm text-slate-700 mt-1 font-medium">{entry.answer}</p>
-                                                </div>
-                                                <p className="text-xs text-slate-400">
-                                                    {new Date(entry.timestamp).toLocaleString()}
-                                                </p>
-                                            </div>
-                                        </div>
-                                    ))}
+                                        ))}
+                                    </div>
                                 </div>
-                            </div>
-                        )}
+                            )}
+
+                        {/* Fallback: Legacy Responses Table (if no interpreted responses) */}
+                        {!callData.interpretedResponses && !callData.analysis?.interpretedResponses &&
+                            callData.responses && Object.keys(callData.responses).length > 0 && (
+                                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                                    <h2 className="text-xl font-semibold text-slate-800 mb-4">✅ Verification Responses</h2>
+                                    <div className="overflow-hidden rounded-lg border border-slate-200">
+                                        <table className="min-w-full divide-y divide-slate-200">
+                                            <thead className="bg-slate-50">
+                                                <tr>
+                                                    <th className="px-4 py-3 text-left text-sm font-semibold text-slate-700">Question</th>
+                                                    <th className="px-4 py-3 text-left text-sm font-semibold text-slate-700 w-24">Response</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-100">
+                                                {Object.entries(callData.responses).map(([key, value]) => (
+                                                    <tr key={key}>
+                                                        <td className="px-4 py-3 text-sm text-slate-700">
+                                                            {questionLabels[key] || key}
+                                                        </td>
+                                                        <td className="px-4 py-3 text-sm">
+                                                            {getResponseBadge(value)}
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            )}
+
+                        {/* Full Transcript */}
+                        {
+                            callData.conversation && callData.conversation.length > 0 && (
+                                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                                    <h2 className="text-xl font-semibold text-slate-800 mb-4">💬 Full Conversation</h2>
+                                    <div className="space-y-4">
+                                        {callData.conversation.map((entry, index) => (
+                                            <div key={index} className="flex gap-4">
+                                                <div className="flex-shrink-0">
+                                                    <div className="w-8 h-8 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center text-sm font-medium">
+                                                        {index + 1}
+                                                    </div>
+                                                </div>
+                                                <div className="flex-1 space-y-2">
+                                                    <div className="bg-purple-50 border border-purple-200 rounded-lg p-3">
+                                                        <p className="text-xs text-purple-600 font-medium">🤖 TrustCheck AI</p>
+                                                        <p className="text-sm text-slate-700 mt-1">{entry.question}</p>
+                                                    </div>
+                                                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                                                        <p className="text-xs text-blue-600 font-medium">👤 HR Response</p>
+                                                        <p className="text-sm text-slate-700 mt-1 font-medium">{entry.answer}</p>
+                                                    </div>
+                                                    <p className="text-xs text-slate-400">
+                                                        {new Date(entry.timestamp).toLocaleString()}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )
+                        }
 
                         {/* Back Button */}
                         <div className="flex justify-center pt-4">
@@ -231,14 +360,14 @@ const CallTranscriptPage = () => {
                                 ← Back to Check Details
                             </Link>
                         </div>
-                    </div>
+                    </div >
                 ) : (
                     <div className="bg-slate-50 border border-slate-200 rounded-xl p-6 text-center">
                         <p className="text-slate-600">No call data available</p>
                     </div>
                 )}
-            </main>
-        </div>
+            </main >
+        </div >
     );
 };
 

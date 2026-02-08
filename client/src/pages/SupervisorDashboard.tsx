@@ -7,6 +7,7 @@ interface Client {
     clientId: string;
     companyName: string;
     skuName: string;
+    contactEmail?: string;
 }
 
 interface Case {
@@ -42,6 +43,16 @@ interface Stats {
     completedCount: number;
 }
 
+interface ReportPreview {
+    clientName: string;
+    clientEmail: string;
+    greenEmployees: any[];
+    redEmployees: any[];
+    greenCount: number;
+    redCount: number;
+    totalChecks: number;
+}
+
 const SupervisorDashboard = () => {
     const [clients, setClients] = useState<Client[]>([]);
     const [cases, setCases] = useState<Case[]>([]);
@@ -60,6 +71,16 @@ const SupervisorDashboard = () => {
     const [filterStatus, setFilterStatus] = useState<string>('');
     const [filterClient, setFilterClient] = useState<string>('');
     const [filterCheckType, setFilterCheckType] = useState<string>('');
+
+    // Report modal state
+    const [showReportModal, setShowReportModal] = useState(false);
+    const [selectedClientForReport, setSelectedClientForReport] = useState<string>('');
+    const [reportPreview, setReportPreview] = useState<ReportPreview | null>(null);
+    const [reportEmail, setReportEmail] = useState('');
+    const [sendingReport, setSendingReport] = useState(false);
+    const [reportSent, setReportSent] = useState(false);
+    const [generatingSheet, setGeneratingSheet] = useState(false);
+    const [sheetUrl, setSheetUrl] = useState<string | null>(null);
 
     useEffect(() => {
         fetchAllData();
@@ -154,6 +175,66 @@ const SupervisorDashboard = () => {
         return client?.companyName || 'Unknown';
     };
 
+    // Report functions
+    const openReportModal = async (clientId: string) => {
+        setSelectedClientForReport(clientId);
+        setShowReportModal(true);
+        setReportSent(false);
+        setReportPreview(null);
+
+        try {
+            const res = await axios.post(`/api/reports/preview/${clientId}`);
+            setReportPreview(res.data.preview);
+            setReportEmail(res.data.preview.clientEmail || '');
+        } catch (error) {
+            console.error('Error fetching report preview:', error);
+        }
+    };
+
+    const sendReport = async () => {
+        if (!selectedClientForReport) return;
+
+        setSendingReport(true);
+        try {
+            await axios.post(`/api/reports/client/${selectedClientForReport}`, {
+                email: reportEmail
+            });
+            setReportSent(true);
+        } catch (error) {
+            console.error('Error sending report:', error);
+            alert('Failed to send report. Please try again.');
+        } finally {
+            setSendingReport(false);
+        }
+    };
+
+    const generateSheet = async () => {
+        if (!selectedClientForReport) return;
+
+        setGeneratingSheet(true);
+        try {
+            const res = await axios.post(`/api/reports/sheet/${selectedClientForReport}`);
+            if (res.data.success) {
+                setSheetUrl(res.data.data.spreadsheetUrl);
+                window.open(res.data.data.spreadsheetUrl, '_blank');
+            }
+        } catch (error) {
+            console.error('Error generating sheet:', error);
+            alert('Failed to generate Google Sheet. Please try again.');
+        } finally {
+            setGeneratingSheet(false);
+        }
+    };
+
+    const closeReportModal = () => {
+        setShowReportModal(false);
+        setSelectedClientForReport('');
+        setReportPreview(null);
+        setReportEmail('');
+        setReportSent(false);
+        setSheetUrl(null);
+    };
+
     // Filter checks based on search and filters
     const filteredChecks = checks.filter(check => {
         const caseData = cases.find(c => c.caseId === check.caseId);
@@ -187,9 +268,35 @@ const SupervisorDashboard = () => {
 
             <div className="max-w-7xl mx-auto px-4 py-8">
                 {/* Header */}
-                <div className="mb-8">
-                    <h1 className="text-3xl font-bold text-slate-800">👔 Supervisor Dashboard</h1>
-                    <p className="text-slate-600 mt-2">Monitor all cases, checks, and zone statuses</p>
+                <div className="mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                    <div>
+                        <h1 className="text-3xl font-bold text-slate-800">👔 Supervisor Dashboard</h1>
+                        <p className="text-slate-600 mt-2">Monitor all cases, checks, and zone statuses</p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <select
+                            className="px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                            value={selectedClientForReport}
+                            onChange={(e) => setSelectedClientForReport(e.target.value)}
+                        >
+                            <option value="">Select Client</option>
+                            {clients.map(client => (
+                                <option key={client.clientId} value={client.clientId}>
+                                    {client.companyName}
+                                </option>
+                            ))}
+                        </select>
+                        <button
+                            onClick={() => selectedClientForReport && openReportModal(selectedClientForReport)}
+                            disabled={!selectedClientForReport}
+                            className={`px-4 py-2 rounded-lg font-medium flex items-center gap-2 transition-colors ${selectedClientForReport
+                                ? 'bg-blue-600 text-white hover:bg-blue-700'
+                                : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                                }`}
+                        >
+                            📧 Send Client Report
+                        </button>
+                    </div>
                 </div>
 
                 {/* Stats Cards */}
@@ -202,13 +309,13 @@ const SupervisorDashboard = () => {
                         <p className="text-sm text-slate-600">Total Checks</p>
                         <p className="text-2xl font-bold text-slate-800">{stats.totalChecks}</p>
                     </div>
-                    <div className="bg-blue-50 rounded-xl shadow-sm border border-blue-200 p-4">
-                        <p className="text-sm text-blue-600">Green Zone</p>
-                        <p className="text-2xl font-bold text-blue-700">{stats.greenZoneCount}</p>
+                    <div className="bg-green-50 rounded-xl shadow-sm border border-green-200 p-4">
+                        <p className="text-sm text-green-600">Green Zone</p>
+                        <p className="text-2xl font-bold text-green-700">{stats.greenZoneCount}</p>
                     </div>
-                    <div className="bg-slate-100 rounded-xl shadow-sm border border-slate-300 p-4">
-                        <p className="text-sm text-slate-600">Red Zone</p>
-                        <p className="text-2xl font-bold text-slate-800">{stats.redZoneCount}</p>
+                    <div className="bg-red-50 rounded-xl shadow-sm border border-red-200 p-4">
+                        <p className="text-sm text-red-600">Red Zone</p>
+                        <p className="text-2xl font-bold text-red-700">{stats.redZoneCount}</p>
                     </div>
                     <div className="bg-slate-50 rounded-xl shadow-sm border border-slate-200 p-4">
                         <p className="text-sm text-slate-600">Pending</p>
@@ -227,11 +334,11 @@ const SupervisorDashboard = () => {
                 {/* Quick Access Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
                     <Link to="/zones/green" className="block">
-                        <div className="bg-blue-600 rounded-xl shadow-lg p-6 text-white hover:bg-blue-700 transition-colors">
+                        <div className="bg-gradient-to-r from-green-500 to-green-600 rounded-xl shadow-lg p-6 text-white hover:from-green-600 hover:to-green-700 transition-colors">
                             <div className="flex items-center justify-between">
                                 <div>
                                     <h3 className="text-xl font-bold">✓ Green Zone</h3>
-                                    <p className="text-blue-100 mt-1">Verified & Low Risk Checks</p>
+                                    <p className="text-green-100 mt-1">Verified & Low Risk Checks</p>
                                     <p className="text-3xl font-bold mt-2">{stats.greenZoneCount} checks</p>
                                 </div>
                                 <span className="text-5xl opacity-50">✓</span>
@@ -239,11 +346,11 @@ const SupervisorDashboard = () => {
                         </div>
                     </Link>
                     <Link to="/zones/red" className="block">
-                        <div className="bg-slate-800 rounded-xl shadow-lg p-6 text-white hover:bg-slate-900 transition-colors">
+                        <div className="bg-gradient-to-r from-red-500 to-red-600 rounded-xl shadow-lg p-6 text-white hover:from-red-600 hover:to-red-700 transition-colors">
                             <div className="flex items-center justify-between">
                                 <div>
                                     <h3 className="text-xl font-bold">⚠ Red Zone</h3>
-                                    <p className="text-slate-300 mt-1">High Risk & Flagged Checks</p>
+                                    <p className="text-red-100 mt-1">High Risk & Flagged Checks</p>
                                     <p className="text-3xl font-bold mt-2">{stats.redZoneCount} checks</p>
                                 </div>
                                 <span className="text-5xl opacity-50">⚠</span>
@@ -416,6 +523,155 @@ const SupervisorDashboard = () => {
                     </div>
                 </div>
             </div>
+
+            {/* Report Modal */}
+            {showReportModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+                        <div className="p-6 border-b border-slate-200">
+                            <div className="flex justify-between items-center">
+                                <h2 className="text-2xl font-bold text-slate-800">📧 Send Client Report</h2>
+                                <button
+                                    onClick={closeReportModal}
+                                    className="text-slate-400 hover:text-slate-600 text-2xl"
+                                >
+                                    ×
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="p-6">
+                            {reportSent ? (
+                                <div className="text-center py-8">
+                                    <div className="text-6xl mb-4">✅</div>
+                                    <h3 className="text-xl font-bold text-green-600 mb-2">Report Sent Successfully!</h3>
+                                    <p className="text-slate-600">The verification report has been sent to the client.</p>
+                                    <button
+                                        onClick={closeReportModal}
+                                        className="mt-6 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                                    >
+                                        Close
+                                    </button>
+                                </div>
+                            ) : reportPreview ? (
+                                <>
+                                    <div className="mb-6">
+                                        <h3 className="font-semibold text-slate-700 mb-2">Report Preview for: {reportPreview.clientName}</h3>
+
+                                        {/* Stats */}
+                                        <div className="grid grid-cols-3 gap-4 mb-6">
+                                            <div className="bg-green-50 p-4 rounded-lg text-center border border-green-200">
+                                                <div className="text-2xl font-bold text-green-600">{reportPreview.greenCount}</div>
+                                                <div className="text-sm text-green-700">Green Zone</div>
+                                            </div>
+                                            <div className="bg-red-50 p-4 rounded-lg text-center border border-red-200">
+                                                <div className="text-2xl font-bold text-red-600">{reportPreview.redCount}</div>
+                                                <div className="text-sm text-red-700">Red Zone</div>
+                                            </div>
+                                            <div className="bg-blue-50 p-4 rounded-lg text-center border border-blue-200">
+                                                <div className="text-2xl font-bold text-blue-600">{reportPreview.totalChecks}</div>
+                                                <div className="text-sm text-blue-700">Total Checks</div>
+                                            </div>
+                                        </div>
+
+                                        {/* Green Zone Employees */}
+                                        {reportPreview.greenEmployees.length > 0 && (
+                                            <div className="mb-4">
+                                                <h4 className="font-medium text-green-700 mb-2">✅ Green Zone (Good to Go)</h4>
+                                                <div className="bg-green-50 rounded-lg p-3 border border-green-200">
+                                                    {reportPreview.greenEmployees.map((emp, idx) => (
+                                                        <div key={idx} className="flex justify-between py-1 border-b border-green-100 last:border-0">
+                                                            <span className="font-medium">{emp.employeeName}</span>
+                                                            <span className="text-sm text-green-600">{emp.checkType} - {emp.riskScore}%</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Red Zone Employees */}
+                                        {reportPreview.redEmployees.length > 0 && (
+                                            <div className="mb-4">
+                                                <h4 className="font-medium text-red-700 mb-2">⚠️ Red Zone (Needs Discussion)</h4>
+                                                <div className="bg-red-50 rounded-lg p-3 border border-red-200">
+                                                    {reportPreview.redEmployees.map((emp, idx) => (
+                                                        <div key={idx} className="flex justify-between py-1 border-b border-red-100 last:border-0">
+                                                            <span className="font-medium">{emp.employeeName}</span>
+                                                            <span className="text-sm text-red-600">{emp.checkType} - {emp.riskScore}%</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Email Input */}
+                                        <div className="mt-6">
+                                            <label className="block text-sm font-medium text-slate-700 mb-1">
+                                                Client Email
+                                            </label>
+                                            <input
+                                                type="email"
+                                                value={reportEmail}
+                                                onChange={(e) => setReportEmail(e.target.value)}
+                                                placeholder="Enter client email address"
+                                                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                                            />
+                                        </div>
+                                        {/* Sheet URL display */}
+                                        {sheetUrl && (
+                                            <div className="mt-4 p-3 bg-green-50 rounded-lg border border-green-200">
+                                                <p className="text-sm text-green-700 font-medium">✅ Google Sheet Generated!</p>
+                                                <a
+                                                    href={sheetUrl}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="text-blue-600 hover:underline text-sm"
+                                                >
+                                                    Open Sheet →
+                                                </a>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div className="flex justify-end gap-3">
+                                        <button
+                                            onClick={closeReportModal}
+                                            className="px-6 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            onClick={generateSheet}
+                                            disabled={generatingSheet}
+                                            className={`px-6 py-2 rounded-lg font-medium flex items-center gap-2 ${!generatingSheet
+                                                ? 'bg-green-600 text-white hover:bg-green-700'
+                                                : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                                                }`}
+                                        >
+                                            {generatingSheet ? 'Generating...' : '📊 Generate Sheet'}
+                                        </button>
+                                        <button
+                                            onClick={sendReport}
+                                            disabled={!reportEmail || sendingReport}
+                                            className={`px-6 py-2 rounded-lg font-medium flex items-center gap-2 ${reportEmail && !sendingReport
+                                                ? 'bg-blue-600 text-white hover:bg-blue-700'
+                                                : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                                                }`}
+                                        >
+                                            {sendingReport ? 'Sending...' : '📧 Send Email'}
+                                        </button>
+                                    </div>
+                                </>
+                            ) : (
+                                <div className="text-center py-8">
+                                    <div className="animate-spin rounded-full h-10 w-10 border-4 border-blue-600 border-t-transparent mx-auto"></div>
+                                    <p className="mt-4 text-slate-600">Loading report preview...</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

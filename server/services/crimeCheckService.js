@@ -15,7 +15,7 @@ const { GoogleGenAI } = require("@google/genai");
 require('dotenv').config();
 
 const client = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-const MODEL_NAME = "gemini-2.5-flash";
+const MODEL_NAME = "gemini-3-flash-preview";
 
 // Configuration
 const CRIME_CHECK_CONFIG = {
@@ -58,13 +58,7 @@ async function searchCourtRecords(candidateData) {
         };
     } catch (error) {
         console.error('Court record search error:', error.message);
-        return {
-            status: 'ERROR',
-            message: error.message,
-            pendingCases: [],
-            disposedCases: [],
-            hasCriminalRecord: false
-        };
+        throw error;
     }
 }
 
@@ -126,15 +120,7 @@ Keep the response realistic - most people have clean records.
         };
     } catch (error) {
         console.error('Error simulating court records:', error.message);
-        return {
-            status: 'CLEAR',
-            pendingCases: [],
-            disposedCases: [],
-            hasCriminalRecord: false,
-            totalCasesFound: 0,
-            isMock: true,
-            remarks: 'Mock response - actual search failed'
-        };
+        throw error;
     }
 }
 
@@ -197,18 +183,7 @@ For demo, 99% of candidates should be CLEAR on all lists.
         };
     } catch (error) {
         console.error('Watchlist check error:', error.message);
-        return {
-            overallStatus: 'CLEAR',
-            checks: [
-                { database: 'OFAC', status: 'CLEAR', matchConfidence: 0 },
-                { database: 'UN_SANCTIONS', status: 'CLEAR', matchConfidence: 0 },
-                { database: 'INTERPOL', status: 'CLEAR', matchConfidence: 0 },
-                { database: 'PEP', status: 'CLEAR', matchConfidence: 0 }
-            ],
-            pepStatus: 'NOT_PEP',
-            riskIndicators: [],
-            isMock: true
-        };
+        throw error;
     }
 }
 
@@ -275,16 +250,7 @@ For demo, 95% of candidates should have NEUTRAL sentiment with no adverse findin
         };
     } catch (error) {
         console.error('Adverse media screening error:', error.message);
-        return {
-            overallSentiment: 'NEUTRAL',
-            adverseFindings: [],
-            positiveFindings: [],
-            totalArticlesScanned: 0,
-            relevantArticlesFound: 0,
-            riskLevel: 'LOW_RISK',
-            summary: 'Unable to complete media screening',
-            isMock: true
-        };
+        throw error;
     }
 }
 
@@ -336,12 +302,7 @@ Analyze and return JSON:
         };
     } catch (error) {
         console.error('PCC verification error:', error.message);
-        return {
-            isAuthentic: false,
-            verificationStatus: 'UNVERIFIED',
-            remarks: error.message,
-            isMock: true
-        };
+        throw error;
     }
 }
 

@@ -66,8 +66,9 @@ router.post('/:id/execute', async (req, res) => {
             result
         });
     } catch (error) {
-        console.error('Error executing check:', error);
-        res.status(500).json({ error: 'Failed to execute check' });
+        console.error('Error executing check (checkRoutes):', error);
+        console.error('Stack trace:', error.stack);
+        res.status(500).json({ error: error.message, stack: error.stack });
     }
 });
 

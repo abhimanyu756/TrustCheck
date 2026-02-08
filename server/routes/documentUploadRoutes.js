@@ -136,18 +136,32 @@ router.get('/case/:caseId', async (req, res) => {
 /**
  * Download a specific document
  * GET /api/document-upload/download/:documentId
+ * Query params: ?preview=true for inline display (browser preview)
  */
 router.get('/download/:documentId', async (req, res) => {
     try {
         const { documentId } = req.params;
+        const { preview } = req.query;
         const document = await getDocument(documentId);
 
         if (!document) {
             return res.status(404).json({ error: 'Document not found' });
         }
 
+        if (!document.fileData) {
+            return res.status(404).json({ error: 'Document file not found on disk' });
+        }
+
         res.setHeader('Content-Type', document.fileType);
-        res.setHeader('Content-Disposition', `attachment; filename="${document.fileName}"`);
+        res.setHeader('Content-Length', document.fileData.length);
+
+        // Use inline for preview mode (renders in browser), attachment for download
+        if (preview === 'true') {
+            res.setHeader('Content-Disposition', `inline; filename="${document.fileName}"`);
+        } else {
+            res.setHeader('Content-Disposition', `attachment; filename="${document.fileName}"`);
+        }
+
         res.send(document.fileData);
 
     } catch (error) {
@@ -157,6 +171,7 @@ router.get('/download/:documentId', async (req, res) => {
         });
     }
 });
+
 
 /**
  * Delete a document

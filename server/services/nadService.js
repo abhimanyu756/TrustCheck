@@ -12,7 +12,7 @@ const { GoogleGenAI } = require("@google/genai");
 require('dotenv').config();
 
 const client = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-const MODEL_NAME = "gemini-2.5-flash";
+const MODEL_NAME = "gemini-3-flash-preview";
 
 // Configuration
 const NAD_CONFIG = {
@@ -186,7 +186,7 @@ Make the response realistic - if some fields don't match exactly, note the discr
             model: MODEL_NAME,
             contents: [prompt]
         });
-        const responseText = result.text;
+        const responseText = typeof result.text === 'function' ? result.text() : result.text;
 
         // Parse JSON response
         const jsonMatch = responseText.match(/\{[\s\S]*\}/);

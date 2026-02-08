@@ -48,13 +48,21 @@ const initDB = async () => {
 
 /**
  * Generate embeddings using Gemini (OLD SDK)
- * Using text-embedding-004 with 768 dimensions to match Pinecone index
+ * Using gemini-embedding-001 (the current valid model)
+ * Note: gemini-embedding-001 outputs 3072 dims by default, but we need 768 for Pinecone
+ * We'll truncate/average to match the index dimension
  */
 const generateEmbedding = async (text) => {
   try {
-    const model = genAI.getGenerativeModel({ model: "text-embedding-004" });
+    const model = genAI.getGenerativeModel({ model: "gemini-embedding-001" });
     const result = await model.embedContent(text);
-    return result.embedding.values;
+    const fullEmbedding = result.embedding.values;
+
+    // If embedding is larger than 768 dims, truncate to match Pinecone index
+    if (fullEmbedding.length > 768) {
+      return fullEmbedding.slice(0, 768);
+    }
+    return fullEmbedding;
   } catch (error) {
     console.error('Embedding generation error:', error);
     // Fallback: return a random vector (Pinecone rejects all-zero vectors)
@@ -563,7 +571,7 @@ const getAllClients = async () => {
 // CASE OPERATIONS
 // ============================================
 
-const saveCase = async (clientId, employeeData, previousEmployments = []) => {
+const saveCase = async (clientId, employeeData, previousEmployments = [], educationData = {}, selectedChecks = null) => {
   try {
     const caseId = `CASE_${new Date().toISOString().split('T')[0].replace(/-/g, '')}_EMP${Math.random().toString(36).substr(2, 3).toUpperCase()}`;
     const timestamp = new Date().toISOString();
@@ -589,6 +597,11 @@ const saveCase = async (clientId, employeeData, previousEmployments = []) => {
         employee_phone: employeeData.employeePhone || '',
         date_of_birth: employeeData.dateOfBirth || '',
         position_applied: employeeData.positionApplied,
+        // Education data
+        education_institution: educationData.institution || '',
+        education_degree: educationData.degree || '',
+        education_year: educationData.yearOfPassing || '',
+        registrar_email: educationData.registrarEmail || '',
         status: 'PENDING',
         overall_risk_level: '',
         created_at: timestamp,
@@ -596,22 +609,31 @@ const saveCase = async (clientId, employeeData, previousEmployments = []) => {
       }
     }]);
 
-    // Auto-create checks: 1 Education + 1 Crime + N Employment
+    // Auto-create checks based on user selection
     const checkIds = [];
 
-    // 1. Education Check
-    const eduCheckId = await saveCheck(caseId, 'EDUCATION', null, null);
-    checkIds.push(eduCheckId);
+    // Default to true for all if selectedChecks is missing (backward compatibility)
+    const options = selectedChecks || { education: true, crime: true, employment: true };
+
+    // 1. Education Check (pass education data)
+    if (options.education) {
+      const eduCheckId = await saveCheck(caseId, 'EDUCATION', null, null, educationData);
+      checkIds.push(eduCheckId);
+    }
 
     // 2. Crime Check
-    const crimeCheckId = await saveCheck(caseId, 'CRIME', null, null);
-    checkIds.push(crimeCheckId);
+    if (options.crime) {
+      const crimeCheckId = await saveCheck(caseId, 'CRIME', null, null);
+      checkIds.push(crimeCheckId);
+    }
 
     // 3. Employment Checks (one per previous company)
-    for (let i = 0; i < previousEmployments.length; i++) {
-      const employment = previousEmployments[i];
-      const empCheckId = await saveCheck(caseId, 'EMPLOYMENT', employment, i + 1);
-      checkIds.push(empCheckId);
+    if (options.employment) {
+      for (let i = 0; i < previousEmployments.length; i++) {
+        const employment = previousEmployments[i];
+        const empCheckId = await saveCheck(caseId, 'EMPLOYMENT', employment, i + 1);
+        checkIds.push(empCheckId);
+      }
     }
 
     return {
@@ -728,7 +750,7 @@ const updateCaseStatus = async (caseId, status, overallRiskLevel = null) => {
 // CHECK OPERATIONS
 // ============================================
 
-const saveCheck = async (caseId, checkType, employmentData = null, companyIndex = null) => {
+const saveCheck = async (caseId, checkType, employmentData = null, companyIndex = null, educationData = null) => {
   try {
     const timestamp = new Date().toISOString();
     const dateStr = timestamp.split('T')[0].replace(/-/g, '');
@@ -747,6 +769,7 @@ const saveCheck = async (caseId, checkType, employmentData = null, companyIndex 
       Check ${checkType}
       Case: ${caseId}
       ${employmentData ? `Company: ${employmentData.companyName}` : ''}
+      ${educationData ? `Institution: ${educationData.institution}` : ''}
     `.trim();
 
     const embedding = await generateEmbedding(searchText);
@@ -756,6 +779,7 @@ const saveCheck = async (caseId, checkType, employmentData = null, companyIndex 
       check_id: checkId,
       case_id: caseId,
       check_type: checkType,
+      // Employment data
       company_name: employmentData?.companyName || '',
       company_index: companyIndex || 0,
       hr_email: employmentData?.hrEmail || '',
@@ -763,6 +787,12 @@ const saveCheck = async (caseId, checkType, employmentData = null, companyIndex 
       employment_dates: employmentData?.employmentDates || '',
       designation: employmentData?.designation || '',
       uan_number: employmentData?.uanNumber || '',
+      // Education data
+      education_institution: educationData?.institution || '',
+      education_degree: educationData?.degree || '',
+      education_year: educationData?.yearOfPassing || '',
+      registrar_email: educationData?.registrarEmail || '',
+      // Status fields
       status: 'PENDING',
       ai_agent_status: 'NOT_STARTED',
       verification_data: '{}',
@@ -806,6 +836,12 @@ const getCheck = async (checkId) => {
       employmentDates: metadata.employment_dates,
       designation: metadata.designation,
       uanNumber: metadata.uan_number,
+      // Education fields
+      educationInstitution: metadata.education_institution || '',
+      educationDegree: metadata.education_degree || '',
+      educationYear: metadata.education_year || '',
+      registrarEmail: metadata.registrar_email || '',
+      // Status fields
       status: metadata.status,
       zone: metadata.zone || '',
       aiAgentStatus: metadata.ai_agent_status,
@@ -815,7 +851,8 @@ const getCheck = async (checkId) => {
       riskLevel: metadata.risk_level,
       startedAt: metadata.started_at,
       completedAt: metadata.completed_at,
-      createdAt: metadata.created_at
+      createdAt: metadata.created_at,
+      executionCount: parseInt(metadata.execution_count || '0', 10)
     };
   } catch (error) {
     console.error('Error getting check:', error);
@@ -846,10 +883,12 @@ const getChecksByCase = async (caseId) => {
         hrEmail: metadata.hr_email,
         employmentDates: metadata.employment_dates,
         status: metadata.status,
+        zone: metadata.zone || '',
         aiAgentStatus: metadata.ai_agent_status,
         riskScore: metadata.risk_score,
         riskLevel: metadata.risk_level,
-        createdAt: metadata.created_at
+        createdAt: metadata.created_at,
+        executionCount: parseInt(metadata.execution_count || '0', 10)
       };
     });
 
@@ -932,7 +971,10 @@ const updateCheckStatus = async (checkId, status, data = {}) => {
       risk_score: data.riskScore !== undefined ? data.riskScore : metadata.risk_score,
       risk_level: data.riskLevel || metadata.risk_level,
       started_at: data.startedAt || metadata.started_at || (status === 'IN_PROGRESS' ? timestamp : ''),
-      completed_at: status === 'COMPLETED' ? timestamp : (metadata.completed_at || '')
+      completed_at: status === 'COMPLETED' ? timestamp : (metadata.completed_at || ''),
+      execution_count: status === 'IN_PROGRESS'
+        ? (parseInt(metadata.execution_count || '0', 10) + 1)
+        : (metadata.execution_count || 0)
     };
 
     await index.upsert([{
@@ -954,6 +996,22 @@ const saveDocument = async (clientId, caseId, checkId, documentType, fileData) =
     const documentId = `DOC_${new Date().toISOString().split('T')[0].replace(/-/g, '')}_${Math.random().toString(36).substr(2, 8).toUpperCase()}`;
     const timestamp = new Date().toISOString();
 
+    // Save file to filesystem instead of Pinecone metadata
+    const fs = require('fs');
+    const path = require('path');
+    const uploadsDir = path.join(__dirname, '..', 'uploads', clientId, caseId, checkId);
+
+    // Create directory structure if it doesn't exist
+    fs.mkdirSync(uploadsDir, { recursive: true });
+
+    // Save file with unique name
+    const fileExtension = path.extname(fileData.fileName);
+    const savedFileName = `${documentId}${fileExtension}`;
+    const filePath = path.join(uploadsDir, savedFileName);
+
+    fs.writeFileSync(filePath, fileData.fileBuffer);
+    console.log(`📁 File saved to: ${filePath}`);
+
     const searchText = `
       Document
       Type: ${documentType}
@@ -963,8 +1021,7 @@ const saveDocument = async (clientId, caseId, checkId, documentType, fileData) =
 
     const embedding = await generateEmbedding(searchText);
 
-    // Store file as base64 in metadata (for small files)
-    // For larger files, consider using external storage (S3, etc.)
+    // Store file path in metadata (not the actual file data)
     await index.upsert([{
       id: `document_${documentId}`,
       values: embedding,
@@ -978,8 +1035,7 @@ const saveDocument = async (clientId, caseId, checkId, documentType, fileData) =
         file_name: fileData.fileName,
         file_type: fileData.fileType,
         file_size: fileData.fileSize,
-        // Store file as base64 string (limit: ~40KB per metadata field)
-        file_data: fileData.fileBuffer.toString('base64').substring(0, 40000),
+        file_path: filePath,
         uploaded_at: timestamp
       }
     }]);
@@ -1103,6 +1159,18 @@ const getDocument = async (documentId) => {
     if (!vector) return null;
 
     const metadata = vector.metadata;
+
+    // Read file from filesystem
+    const fs = require('fs');
+    let fileData = null;
+
+    if (metadata.file_path && fs.existsSync(metadata.file_path)) {
+      fileData = fs.readFileSync(metadata.file_path);
+    } else if (metadata.file_data) {
+      // Legacy: fallback to base64 data if file_path doesn't exist
+      fileData = Buffer.from(metadata.file_data, 'base64');
+    }
+
     return {
       documentId: metadata.document_id,
       clientId: metadata.client_id,
@@ -1112,7 +1180,7 @@ const getDocument = async (documentId) => {
       fileName: metadata.file_name,
       fileType: metadata.file_type,
       fileSize: metadata.file_size,
-      fileData: Buffer.from(metadata.file_data, 'base64'),
+      fileData: fileData,
       uploadedAt: metadata.uploaded_at
     };
   } catch (error) {
@@ -1123,6 +1191,18 @@ const getDocument = async (documentId) => {
 
 const deleteDocument = async (documentId) => {
   try {
+    // First get the document to find the file path
+    const result = await index.fetch([`document_${documentId}`]);
+    const vector = result.records[`document_${documentId}`];
+
+    if (vector && vector.metadata.file_path) {
+      const fs = require('fs');
+      if (fs.existsSync(vector.metadata.file_path)) {
+        fs.unlinkSync(vector.metadata.file_path);
+        console.log(`🗑️ Deleted file: ${vector.metadata.file_path}`);
+      }
+    }
+
     await index.deleteOne(`document_${documentId}`);
     return { success: true };
   } catch (error) {
@@ -1130,6 +1210,7 @@ const deleteDocument = async (documentId) => {
     throw error;
   }
 };
+
 
 // ============================================
 // ACTIVITY LOG OPERATIONS

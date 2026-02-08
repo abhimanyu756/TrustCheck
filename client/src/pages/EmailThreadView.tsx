@@ -24,10 +24,18 @@ interface EmailResponse {
     verified: boolean;
 }
 
+interface Check {
+    checkId: string;
+    checkType: 'EMPLOYMENT' | 'EDUCATION' | 'CRIME';
+    candidateName: string;
+    registrarEmail?: string;
+}
+
 const EmailThreadView = () => {
     const { emailId } = useParams<{ emailId: string }>();
     const [email, setEmail] = useState<Email | null>(null);
     const [response, setResponse] = useState<EmailResponse | null>(null);
+    const [check, setCheck] = useState<Check | null>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -48,6 +56,14 @@ const EmailThreadView = () => {
                 if (responsesResponse.data.responses.length > 0) {
                     setResponse(responsesResponse.data.responses[0]);
                 }
+
+                // Fetch check details to determine type (Employment vs Education)
+                try {
+                    const checkResponse = await axios.get(`/api/checks/${foundEmail.checkId}`);
+                    setCheck(checkResponse.data);
+                } catch (e) {
+                    console.error('Error fetching check details:', e);
+                }
             }
         } catch (error) {
             console.error('Error fetching email thread:', error);
@@ -55,6 +71,10 @@ const EmailThreadView = () => {
             setLoading(false);
         }
     };
+
+    const isEducation = check?.checkType === 'EDUCATION';
+    const responderTitle = isEducation ? 'University Registrar' : 'HR';
+    const responseLabel = isEducation ? 'University Response' : 'HR Response';
 
     const getStatusColor = (status: string) => {
         switch (status) {
@@ -225,13 +245,13 @@ const EmailThreadView = () => {
                         <div className="bg-white rounded-xl shadow-sm border-2 border-emerald-200 overflow-hidden">
                             <div className="bg-gradient-to-r from-emerald-50 to-green-50 px-6 py-4 border-b border-emerald-200">
                                 <div className="flex items-center gap-3 mb-3">
-                                    <div className="w-12 h-12 bg-emerald-600 rounded-full flex items-center justify-center">
-                                        <span className="text-white font-bold text-lg">HR</span>
+                                    <div className={`w-12 h-12 ${isEducation ? 'bg-purple-600' : 'bg-emerald-600'} rounded-full flex items-center justify-center`}>
+                                        <span className="text-white font-bold text-lg">{isEducation ? 'Uni' : 'HR'}</span>
                                     </div>
                                     <div className="flex-1">
                                         <div className="flex items-center gap-2">
                                             <span className="font-semibold text-slate-800">{response.hrEmail}</span>
-                                            <span className="text-xs px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full">HR Response</span>
+                                            <span className="text-xs px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full">{responseLabel}</span>
                                             <span className={`text-xs px-2 py-0.5 rounded-full ${response.verified ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
                                                 }`}>
                                                 {response.verified ? '✓ Verified' : '✗ Not Verified'}
@@ -249,7 +269,7 @@ const EmailThreadView = () => {
 
                             <div className="p-6">
                                 <div className="bg-emerald-50 border-l-4 border-emerald-500 p-4 mb-4">
-                                    <p className="text-sm font-semibold text-emerald-800 mb-2">✓ HR has completed the verification form</p>
+                                    <p className="text-sm font-semibold text-emerald-800 mb-2">✓ {responderTitle} has completed the verification form</p>
                                     <p className="text-xs text-emerald-700">The information provided has been recorded and analyzed.</p>
                                 </div>
 
@@ -262,8 +282,8 @@ const EmailThreadView = () => {
                                             <div className="flex items-center gap-3 mb-2">
                                                 <span className="text-3xl">📊</span>
                                                 <div>
-                                                    <p className="font-semibold text-slate-800">HR Response Method: Google Sheets</p>
-                                                    <p className="text-sm text-slate-600">{response.responseData.extractedInfo?.message || 'HR provided Google Sheet link for verification'}</p>
+                                                    <p className="font-semibold text-slate-800">{responderTitle} Response Method: Google Sheets</p>
+                                                    <p className="text-sm text-slate-600">{response.responseData.extractedInfo?.message || `${responderTitle} provided Google Sheet link for verification`}</p>
                                                 </div>
                                             </div>
                                             {response.responseData.googleSheetUrl && (
@@ -281,7 +301,7 @@ const EmailThreadView = () => {
                                         {/* Show raw response if available */}
                                         {response.responseData.rawResponse && (
                                             <div className="bg-slate-50 rounded-lg p-4">
-                                                <p className="text-xs font-semibold text-slate-600 mb-2">HR's Email Message:</p>
+                                                <p className="text-xs font-semibold text-slate-600 mb-2">{responderTitle}'s Email Message:</p>
                                                 <p className="text-sm text-slate-700 whitespace-pre-wrap">
                                                     {response.responseData.rawResponse.split(/On .+wrote:/i)[0].trim()}
                                                 </p>
@@ -332,9 +352,9 @@ const EmailThreadView = () => {
                     ) : (
                         <div className="bg-white rounded-xl shadow-sm border-2 border-yellow-200 p-8 text-center">
                             <div className="text-5xl mb-3">⏳</div>
-                            <h3 className="text-lg font-semibold text-slate-800 mb-2">Awaiting HR Response</h3>
+                            <h3 className="text-lg font-semibold text-slate-800 mb-2">Awaiting {responderTitle} Response</h3>
                             <p className="text-slate-600 mb-4">
-                                The verification email has been sent to HR. We're waiting for them to complete the form.
+                                The verification email has been sent to {responderTitle}. We're waiting for them to complete the form.
                             </p>
                             {email.googleSheetsUrl && (
                                 <a

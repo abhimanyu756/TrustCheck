@@ -60,16 +60,16 @@ const SimpleHome = () => {
 
                 {/* Quick Action Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 max-w-7xl mx-auto mt-16">
-                    <Link to="/zones/green" className="bg-white rounded-2xl p-10 border-2 border-slate-200 hover:border-blue-500 hover:shadow-2xl transition-all group">
-                        <div className="w-20 h-20 bg-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform">
+                    <Link to="/zones/green" className="bg-white rounded-2xl p-10 border-2 border-slate-200 hover:border-green-500 hover:shadow-2xl transition-all group">
+                        <div className="w-20 h-20 bg-gradient-to-br from-green-500 to-green-700 rounded-2xl flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform">
                             <span className="text-4xl text-white">✓</span>
                         </div>
                         <h3 className="font-bold text-slate-900 mb-3 text-xl">Green Zone</h3>
                         <p className="text-slate-600">Auto-approved verifications with low risk scores</p>
                     </Link>
 
-                    <Link to="/zones/red" className="bg-white rounded-2xl p-10 border-2 border-slate-200 hover:border-slate-800 hover:shadow-2xl transition-all group">
-                        <div className="w-20 h-20 bg-slate-800 rounded-2xl flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform">
+                    <Link to="/zones/red" className="bg-white rounded-2xl p-10 border-2 border-slate-200 hover:border-red-500 hover:shadow-2xl transition-all group">
+                        <div className="w-20 h-20 bg-gradient-to-br from-red-500 to-red-700 rounded-2xl flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform">
                             <span className="text-4xl text-white">⚠</span>
                         </div>
                         <h3 className="font-bold text-slate-900 mb-3 text-xl">Red Zone</h3>

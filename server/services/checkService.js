@@ -109,8 +109,21 @@ async function executeCheck(checkId) {
 
         // Update check status to FAILED
         await updateCheckStatus(checkId, 'FAILED', {
-            aiAgentStatus: 'FAILED'
+            aiAgentStatus: 'FAILED',
+            errorMessage: error.message || 'Unknown error occurred'
         });
+
+        // Log the failure in activity log so it's visible in UI
+        await logActivity(
+            'check',
+            checkId,
+            'CHECK_FAILED',
+            `Check execution failed: ${error.message || 'Unknown error'}`,
+            {
+                error: error.message,
+                stack: error.stack?.substring(0, 500)
+            }
+        );
 
         throw error;
     }

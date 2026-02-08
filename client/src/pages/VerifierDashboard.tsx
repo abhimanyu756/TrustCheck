@@ -27,6 +27,7 @@ interface Check {
     aiAgentStatus: string;
     riskScore: number;
     riskLevel: string;
+    executionCount?: number;
 }
 
 interface Document {
@@ -61,7 +62,7 @@ const VerifierDashboard = () => {
     const [selectedCase, setSelectedCase] = useState<string>(() => sessionStorage.getItem('verifier_selectedCase') || '');
     const [checks, setChecks] = useState<Check[]>([]);
     const [documents, setDocuments] = useState<{ [checkId: string]: Document[] }>({});
-    const [executing, setExecuting] = useState<string | null>(null);
+    const [executingChecks, setExecutingChecks] = useState<Set<string>>(new Set());
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -141,10 +142,11 @@ const VerifierDashboard = () => {
             return;
         }
 
-        setExecuting(checkId);
+        // Add to executing set
+        setExecutingChecks(prev => new Set(prev).add(checkId));
         try {
             await axios.post(`/api/checks/${checkId}/execute`);
-            showToast('Check executed successfully!', 'success');
+            showToast(`${checkType} check executed successfully!`, 'success');
             // Refresh checks to get updated status
             if (selectedCase) {
                 fetchChecks(selectedCase);
@@ -153,14 +155,20 @@ const VerifierDashboard = () => {
             console.error('Error executing check:', error);
             showToast('Failed to execute check', 'error');
         } finally {
-            setExecuting(null);
+            // Remove from executing set
+            setExecutingChecks(prev => {
+                const next = new Set(prev);
+                next.delete(checkId);
+                return next;
+            });
         }
     };
 
     const executeAllChecks = async () => {
         if (!selectedCase) return;
 
-        setExecuting('all');
+        // Add 'all' to executing set
+        setExecutingChecks(prev => new Set(prev).add('all'));
         try {
             await axios.post(`/api/cases/${selectedCase}/execute`);
             showToast('All checks executed successfully!', 'success');
@@ -169,7 +177,11 @@ const VerifierDashboard = () => {
             console.error('Error executing all checks:', error);
             showToast('Failed to execute all checks', 'error');
         } finally {
-            setExecuting(null);
+            setExecutingChecks(prev => {
+                const next = new Set(prev);
+                next.delete('all');
+                return next;
+            });
         }
     };
 
@@ -288,10 +300,10 @@ const VerifierDashboard = () => {
                                         </div>
                                         <button
                                             onClick={executeAllChecks}
-                                            disabled={executing !== null}
+                                            disabled={executingChecks.has('all')}
                                             className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                                         >
-                                            {executing === 'all' ? 'Executing...' : 'Execute All Checks'}
+                                            {executingChecks.has('all') ? 'Executing...' : 'Execute All Checks'}
                                         </button>
                                         <Link
                                             to={`/cases/${selectedCase}/extracted-data`}
@@ -325,6 +337,11 @@ const VerifierDashboard = () => {
                                                     <span className={`text-xs px-3 py-1 rounded-full ${getStatusColor(check.status)}`}>
                                                         {check.status}
                                                     </span>
+                                                    {(check.executionCount || 0) > 0 && (
+                                                        <span className="ml-2 text-xs px-2 py-1 rounded-full bg-slate-100 text-slate-600" title="Times executed">
+                                                            🔄 {check.executionCount}x
+                                                        </span>
+                                                    )}
                                                     {check.riskLevel && (
                                                         <p className={`text-sm font-semibold mt-2 ${getRiskColor(check.riskLevel)}`}>
                                                             {check.riskLevel} ({check.riskScore})
@@ -335,9 +352,17 @@ const VerifierDashboard = () => {
 
                                             {/* Documents */}
                                             <div className="mb-4">
-                                                <h5 className="text-sm font-semibold text-slate-700 mb-2">
-                                                    Uploaded Documents ({checkDocs.length})
-                                                </h5>
+                                                <div className="flex items-center justify-between mb-2">
+                                                    <h5 className="text-sm font-semibold text-slate-700">
+                                                        Uploaded Documents ({checkDocs.length})
+                                                    </h5>
+                                                    <Link
+                                                        to={`/uploader?checkId=${check.checkId}`}
+                                                        className="text-sm text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1"
+                                                    >
+                                                        📤 Upload Documents
+                                                    </Link>
+                                                </div>
                                                 {checkDocs.length > 0 ? (
                                                     <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                                                         {checkDocs.map(doc => (
@@ -352,7 +377,16 @@ const VerifierDashboard = () => {
                                                         ))}
                                                     </div>
                                                 ) : (
-                                                    <p className="text-sm text-slate-500 italic">No documents uploaded yet</p>
+                                                    <div className="flex items-center gap-2">
+                                                        <p className="text-sm text-slate-500 italic">No documents uploaded yet</p>
+                                                        <span className="text-slate-400">•</span>
+                                                        <Link
+                                                            to={`/uploader?checkId=${check.checkId}`}
+                                                            className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+                                                        >
+                                                            Upload now →
+                                                        </Link>
+                                                    </div>
                                                 )}
                                             </div>
 
@@ -360,16 +394,23 @@ const VerifierDashboard = () => {
                                             <div className="flex gap-2">
                                                 <button
                                                     onClick={() => executeCheck(check.checkId, check.checkType)}
-                                                    disabled={executing !== null || check.status === 'COMPLETED'}
-                                                    className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                                                    disabled={executingChecks.has(check.checkId) || check.status === 'COMPLETED' || check.status === 'IN_PROGRESS'}
+                                                    className={`flex-1 px-4 py-2 rounded-lg transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed ${check.status === 'FAILED'
+                                                        ? 'bg-orange-600 text-white hover:bg-orange-700'
+                                                        : 'bg-green-600 text-white hover:bg-green-700'
+                                                        }`}
                                                 >
-                                                    {executing === check.checkId ? (
+                                                    {executingChecks.has(check.checkId) ? (
                                                         <span className="flex items-center justify-center gap-2">
-                                                            <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                                                            <div className="animate-spin rounded-full h-4 w-4 border-2 border-slate-400 border-t-transparent"></div>
                                                             Executing...
                                                         </span>
                                                     ) : check.status === 'COMPLETED' ? (
                                                         '✓ Completed'
+                                                    ) : check.status === 'FAILED' ? (
+                                                        '🔄 Retry Check'
+                                                    ) : check.status === 'IN_PROGRESS' ? (
+                                                        '⏳ In Progress'
                                                     ) : (
                                                         'Execute Check'
                                                     )}
@@ -384,9 +425,16 @@ const VerifierDashboard = () => {
 
                                             {/* AI Agent Status */}
                                             {check.aiAgentStatus && check.aiAgentStatus !== 'NOT_STARTED' && (
-                                                <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                                                    <p className="text-sm text-blue-700">
+                                                <div className={`mt-3 p-3 border rounded-lg ${check.aiAgentStatus === 'FAILED'
+                                                    ? 'bg-red-50 border-red-200'
+                                                    : 'bg-blue-50 border-blue-200'
+                                                    }`}>
+                                                    <p className={`text-sm ${check.aiAgentStatus === 'FAILED' ? 'text-red-700' : 'text-blue-700'
+                                                        }`}>
                                                         <span className="font-semibold">AI Agent:</span> {check.aiAgentStatus}
+                                                        {check.aiAgentStatus === 'FAILED' && (
+                                                            <span className="ml-2">❌ Click "Retry Check" to try again</span>
+                                                        )}
                                                     </p>
                                                 </div>
                                             )}

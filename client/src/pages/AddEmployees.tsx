@@ -13,12 +13,20 @@ interface PreviousEmployment {
     uanNumber: string;
 }
 
+interface EducationData {
+    institution: string;
+    degree: string;
+    yearOfPassing: string;
+    registrarEmail: string;
+}
+
 interface Employee {
     employeeName: string;
     employeeEmail: string;
     employeePhone: string;
     dateOfBirth: string;
     positionApplied: string;
+    education: EducationData;
     previousEmployments: PreviousEmployment[];
 }
 
@@ -29,12 +37,20 @@ interface EmploymentErrors {
     designation?: string;
 }
 
+interface EducationErrors {
+    institution?: string;
+    degree?: string;
+    yearOfPassing?: string;
+    registrarEmail?: string;
+}
+
 interface EmployeeErrors {
     employeeName?: string;
     employeeEmail?: string;
     employeePhone?: string;
     dateOfBirth?: string;
     positionApplied?: string;
+    education: EducationErrors;
     employments: EmploymentErrors[];
 }
 
@@ -67,6 +83,12 @@ const AddEmployees = () => {
         employeePhone: '',
         dateOfBirth: '',
         positionApplied: '',
+        education: {
+            institution: '',
+            degree: '',
+            yearOfPassing: '',
+            registrarEmail: ''
+        },
         previousEmployments: [{
             companyName: '',
             hrEmail: '',
@@ -77,12 +99,90 @@ const AddEmployees = () => {
         }]
     }]);
 
+    // Check selection state
+    const [selectedChecks, setSelectedChecks] = useState({
+        education: true,
+        employment: true,
+        crime: true
+    });
+
+    const handleCheckSelectionChange = (checkType: 'education' | 'employment' | 'crime') => {
+        setSelectedChecks(prev => ({
+            ...prev,
+            [checkType]: !prev[checkType]
+        }));
+    };
+
+    // ... existing validation code ...
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+
+        // Validate entire form before submission
+        if (!validateForm()) {
+            return;
+        }
+
+        // Validate at least one check is selected
+        if (!selectedChecks.education && !selectedChecks.employment && !selectedChecks.crime) {
+            alert('Please select at least one verification check type.');
+            return;
+        }
+
+        setLoading(true);
+
+        try {
+            // Create cases for all employees
+            const promises = employees.map(emp =>
+                axios.post('/api/cases', {
+                    clientId,
+                    employeeData: {
+                        employeeName: emp.employeeName,
+                        employeeEmail: emp.employeeEmail,
+                        employeePhone: emp.employeePhone,
+                        dateOfBirth: emp.dateOfBirth,
+                        positionApplied: emp.positionApplied
+                    },
+                    educationData: emp.education,
+                    previousEmployments: emp.previousEmployments,
+                    selectedChecks // Pass selected checks
+                })
+            );
+
+            await Promise.all(promises);
+            alert('All employee cases created successfully!');
+            navigate('/clients');
+        } catch (error) {
+            console.error('Error creating cases:', error);
+            alert('Failed to create employee cases. Please try again.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Helper to get input class based on error state
+    const getInputClass = (hasError: boolean, baseClass: string = '') => {
+        const base = baseClass || 'w-full px-4 py-2 border rounded-lg focus:ring-2';
+        return hasError
+            ? `${base} border-red-500 focus:ring-red-500 focus:border-red-500`
+            : `${base} border-slate-300 focus:ring-blue-500`;
+    };
+
+    const getSmallInputClass = (hasError: boolean) => {
+        const base = 'w-full px-3 py-2 border rounded-lg text-sm';
+        return hasError
+            ? `${base} border-red-500 focus:ring-red-500`
+            : `${base} border-slate-300`;
+    };
+
     const [errors, setErrors] = useState<EmployeeErrors[]>([{
+        education: {},
         employments: [{}]
     }]);
 
     // Initialize errors for new employee
     const createEmptyEmployeeErrors = (): EmployeeErrors => ({
+        education: {},
         employments: [{}]
     });
 
@@ -136,8 +236,8 @@ const AddEmployees = () => {
     // Validate entire form
     const validateForm = (): boolean => {
         let isValid = true;
-        const newErrors: EmployeeErrors[] = employees.map((emp, empIndex) => {
-            const empErrors: EmployeeErrors = { employments: [] };
+        const newErrors: EmployeeErrors[] = employees.map((emp) => {
+            const empErrors: EmployeeErrors = { education: {}, employments: [] };
 
             // Validate employee fields
             empErrors.employeeName = validateEmployeeField('employeeName', emp.employeeName);
@@ -151,21 +251,47 @@ const AddEmployees = () => {
                 isValid = false;
             }
 
-            // Validate employment fields
-            emp.previousEmployments.forEach((employment, compIndex) => {
-                const empltErrors: EmploymentErrors = {};
-                empltErrors.companyName = validateEmploymentField('companyName', employment.companyName);
-                empltErrors.hrEmail = validateEmploymentField('hrEmail', employment.hrEmail);
-                empltErrors.employmentDates = validateEmploymentField('employmentDates', employment.employmentDates);
-                empltErrors.designation = validateEmploymentField('designation', employment.designation);
-
-                if (empltErrors.companyName || empltErrors.hrEmail ||
-                    empltErrors.employmentDates || empltErrors.designation) {
+            // Validate education fields
+            if (selectedChecks.education) {
+                empErrors.education = {};
+                if (!emp.education.institution?.trim()) {
+                    empErrors.education.institution = 'Institution is required';
                     isValid = false;
                 }
+                if (!emp.education.degree?.trim()) {
+                    empErrors.education.degree = 'Degree is required';
+                    isValid = false;
+                }
+                if (!emp.education.yearOfPassing?.trim()) {
+                    empErrors.education.yearOfPassing = 'Year of passing is required';
+                    isValid = false;
+                }
+                if (!emp.education.registrarEmail?.trim()) {
+                    empErrors.education.registrarEmail = 'Registrar email is required';
+                    isValid = false;
+                } else if (!isValidEmail(emp.education.registrarEmail)) {
+                    empErrors.education.registrarEmail = 'Please enter a valid email';
+                    isValid = false;
+                }
+            }
 
-                empErrors.employments.push(empltErrors);
-            });
+            // Validate employment fields
+            if (selectedChecks.employment) {
+                emp.previousEmployments.forEach((employment) => {
+                    const empltErrors: EmploymentErrors = {};
+                    empltErrors.companyName = validateEmploymentField('companyName', employment.companyName);
+                    empltErrors.hrEmail = validateEmploymentField('hrEmail', employment.hrEmail);
+                    empltErrors.employmentDates = validateEmploymentField('employmentDates', employment.employmentDates);
+                    empltErrors.designation = validateEmploymentField('designation', employment.designation);
+
+                    if (empltErrors.companyName || empltErrors.hrEmail ||
+                        empltErrors.employmentDates || empltErrors.designation) {
+                        isValid = false;
+                    }
+
+                    empErrors.employments.push(empltErrors);
+                });
+            }
 
             return empErrors;
         });
@@ -181,6 +307,12 @@ const AddEmployees = () => {
             employeePhone: '',
             dateOfBirth: '',
             positionApplied: '',
+            education: {
+                institution: '',
+                degree: '',
+                yearOfPassing: '',
+                registrarEmail: ''
+            },
             previousEmployments: [{
                 companyName: '',
                 hrEmail: '',
@@ -279,58 +411,6 @@ const AddEmployees = () => {
         setErrors(updatedErrors);
     };
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-
-        // Validate entire form before submission
-        if (!validateForm()) {
-            return;
-        }
-
-        setLoading(true);
-
-        try {
-            // Create cases for all employees
-            const promises = employees.map(emp =>
-                axios.post('/api/cases', {
-                    clientId,
-                    employeeData: {
-                        employeeName: emp.employeeName,
-                        employeeEmail: emp.employeeEmail,
-                        employeePhone: emp.employeePhone,
-                        dateOfBirth: emp.dateOfBirth,
-                        positionApplied: emp.positionApplied
-                    },
-                    previousEmployments: emp.previousEmployments
-                })
-            );
-
-            await Promise.all(promises);
-            alert('All employee cases created successfully!');
-            navigate('/clients');
-        } catch (error) {
-            console.error('Error creating cases:', error);
-            alert('Failed to create employee cases. Please try again.');
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    // Helper to get input class based on error state
-    const getInputClass = (hasError: boolean, baseClass: string = '') => {
-        const base = baseClass || 'w-full px-4 py-2 border rounded-lg focus:ring-2';
-        return hasError
-            ? `${base} border-red-500 focus:ring-red-500 focus:border-red-500`
-            : `${base} border-slate-300 focus:ring-blue-500`;
-    };
-
-    const getSmallInputClass = (hasError: boolean) => {
-        const base = 'w-full px-3 py-2 border rounded-lg text-sm';
-        return hasError
-            ? `${base} border-red-500 focus:ring-red-500`
-            : `${base} border-slate-300`;
-    };
-
     return (
         <div className="min-h-screen bg-slate-50 py-8 px-4">
             <div className="max-w-5xl mx-auto">
@@ -344,11 +424,56 @@ const AddEmployees = () => {
                             { label: 'Add Employees' }
                         ]} />
                         <h1 className="text-3xl font-bold text-slate-800">Add Employees</h1>
-                        <p className="text-slate-600 mt-2">Add employee details and their previous employment history</p>
+                        <p className="text-slate-600 mt-2">Add employee details and select verification checks</p>
                     </div>
                 </div>
 
                 <form onSubmit={handleSubmit}>
+                    {/* Check Selection Panel */}
+                    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
+                        <h3 className="text-lg font-semibold text-slate-800 mb-4">Select Verification Checks</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <label className={`flex items-center p-4 border rounded-lg cursor-pointer transition-colors ${selectedChecks.education ? 'bg-blue-50 border-blue-200' : 'bg-white border-slate-200 hover:bg-slate-50'}`}>
+                                <input
+                                    type="checkbox"
+                                    checked={selectedChecks.education}
+                                    onChange={() => handleCheckSelectionChange('education')}
+                                    className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500 border-gray-300"
+                                />
+                                <div className="ml-3">
+                                    <span className="block text-sm font-medium text-slate-900">Education Verification</span>
+                                    <span className="block text-xs text-slate-500">Degree, Grades, Institution</span>
+                                </div>
+                            </label>
+
+                            <label className={`flex items-center p-4 border rounded-lg cursor-pointer transition-colors ${selectedChecks.employment ? 'bg-blue-50 border-blue-200' : 'bg-white border-slate-200 hover:bg-slate-50'}`}>
+                                <input
+                                    type="checkbox"
+                                    checked={selectedChecks.employment}
+                                    onChange={() => handleCheckSelectionChange('employment')}
+                                    className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500 border-gray-300"
+                                />
+                                <div className="ml-3">
+                                    <span className="block text-sm font-medium text-slate-900">Employment Verification</span>
+                                    <span className="block text-xs text-slate-500">History, Designation, Performance</span>
+                                </div>
+                            </label>
+
+                            <label className={`flex items-center p-4 border rounded-lg cursor-pointer transition-colors ${selectedChecks.crime ? 'bg-blue-50 border-blue-200' : 'bg-white border-slate-200 hover:bg-slate-50'}`}>
+                                <input
+                                    type="checkbox"
+                                    checked={selectedChecks.crime}
+                                    onChange={() => handleCheckSelectionChange('crime')}
+                                    className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500 border-gray-300"
+                                />
+                                <div className="ml-3">
+                                    <span className="block text-sm font-medium text-slate-900">Criminal Record Check</span>
+                                    <span className="block text-xs text-slate-500">Court Records, Watchlists, Police</span>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+
                     {/* Employee Cards */}
                     <div className="space-y-6">
                         {employees.map((employee, empIndex) => (
@@ -440,118 +565,202 @@ const AddEmployees = () => {
                                     </div>
                                 </div>
 
-                                {/* Previous Employment History */}
-                                <div className="border-t border-slate-200 pt-6">
-                                    <div className="flex justify-between items-center mb-4">
-                                        <h4 className="text-lg font-semibold text-slate-800">Previous Employment History</h4>
-                                        <button
-                                            type="button"
-                                            onClick={() => addPreviousEmployment(empIndex)}
-                                            className="text-blue-600 hover:text-blue-700 text-sm font-medium"
-                                        >
-                                            + Add Company
-                                        </button>
-                                    </div>
-
-                                    <div className="space-y-4">
-                                        {employee.previousEmployments.map((employment, compIndex) => (
-                                            <div key={compIndex} className="bg-slate-50 rounded-lg p-4">
-                                                <div className="flex justify-between items-center mb-3">
-                                                    <span className="text-sm font-medium text-slate-700">Company #{compIndex + 1}</span>
-                                                    {employee.previousEmployments.length > 1 && (
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => removePreviousEmployment(empIndex, compIndex)}
-                                                            className="text-red-600 hover:text-red-700 text-xs"
-                                                        >
-                                                            Remove
-                                                        </button>
+                                {/* Education Details - Conditionally Shown */}
+                                {selectedChecks.education && (
+                                    <div className="border-t border-slate-200 pt-6 mt-6">
+                                        <h4 className="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                                            📚 Last Higher Education Details
+                                        </h4>
+                                        <div className="bg-purple-50 rounded-lg p-4">
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <div>
+                                                    <label className="block text-sm font-medium text-slate-700 mb-2">Institution/University Name *</label>
+                                                    <input
+                                                        type="text"
+                                                        value={employee.education?.institution || ''}
+                                                        onChange={(e) => {
+                                                            const updated = [...employees];
+                                                            updated[empIndex].education.institution = e.target.value;
+                                                            setEmployees(updated);
+                                                        }}
+                                                        className={getInputClass(!!errors[empIndex]?.education?.institution)}
+                                                        placeholder="e.g., IIT Delhi"
+                                                    />
+                                                    {errors[empIndex]?.education?.institution && (
+                                                        <p className="text-red-500 text-xs mt-1">{errors[empIndex].education.institution}</p>
                                                     )}
                                                 </div>
-
-                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                                    <div>
-                                                        <label className="block text-xs font-medium text-slate-600 mb-1">Company Name *</label>
-                                                        <input
-                                                            type="text"
-                                                            value={employment.companyName}
-                                                            onChange={(e) => handleEmploymentChange(empIndex, compIndex, 'companyName', e.target.value)}
-                                                            onBlur={(e) => handleEmploymentBlur(empIndex, compIndex, 'companyName', e.target.value)}
-                                                            className={getSmallInputClass(!!errors[empIndex]?.employments?.[compIndex]?.companyName)}
-                                                            placeholder="Previous Corp Ltd"
-                                                        />
-                                                        {errors[empIndex]?.employments?.[compIndex]?.companyName && (
-                                                            <p className="text-red-500 text-xs mt-1">{errors[empIndex].employments[compIndex].companyName}</p>
-                                                        )}
-                                                    </div>
-                                                    <div>
-                                                        <label className="block text-xs font-medium text-slate-600 mb-1">HR Email *</label>
-                                                        <input
-                                                            type="email"
-                                                            value={employment.hrEmail}
-                                                            onChange={(e) => handleEmploymentChange(empIndex, compIndex, 'hrEmail', e.target.value)}
-                                                            onBlur={(e) => handleEmploymentBlur(empIndex, compIndex, 'hrEmail', e.target.value)}
-                                                            className={getSmallInputClass(!!errors[empIndex]?.employments?.[compIndex]?.hrEmail)}
-                                                            placeholder="hr@previouscorp.com"
-                                                        />
-                                                        {errors[empIndex]?.employments?.[compIndex]?.hrEmail && (
-                                                            <p className="text-red-500 text-xs mt-1">{errors[empIndex].employments[compIndex].hrEmail}</p>
-                                                        )}
-                                                    </div>
-                                                    <div>
-                                                        <label className="block text-xs font-medium text-slate-600 mb-1">HR Phone</label>
-                                                        <input
-                                                            type="tel"
-                                                            value={employment.hrPhone}
-                                                            onChange={(e) => handleEmploymentChange(empIndex, compIndex, 'hrPhone', e.target.value)}
-                                                            onBlur={(e) => handleEmploymentBlur(empIndex, compIndex, 'hrPhone', e.target.value)}
-                                                            className={getSmallInputClass(false)}
-                                                            placeholder="+91-9876543210"
-                                                        />
-                                                    </div>
-                                                    <div>
-                                                        <label className="block text-xs font-medium text-slate-600 mb-1">Employment Dates *</label>
-                                                        <input
-                                                            type="text"
-                                                            value={employment.employmentDates}
-                                                            onChange={(e) => handleEmploymentChange(empIndex, compIndex, 'employmentDates', e.target.value)}
-                                                            onBlur={(e) => handleEmploymentBlur(empIndex, compIndex, 'employmentDates', e.target.value)}
-                                                            className={getSmallInputClass(!!errors[empIndex]?.employments?.[compIndex]?.employmentDates)}
-                                                            placeholder="2020-01-15 to 2023-06-30"
-                                                        />
-                                                        {errors[empIndex]?.employments?.[compIndex]?.employmentDates && (
-                                                            <p className="text-red-500 text-xs mt-1">{errors[empIndex].employments[compIndex].employmentDates}</p>
-                                                        )}
-                                                    </div>
-                                                    <div>
-                                                        <label className="block text-xs font-medium text-slate-600 mb-1">Designation *</label>
-                                                        <input
-                                                            type="text"
-                                                            value={employment.designation}
-                                                            onChange={(e) => handleEmploymentChange(empIndex, compIndex, 'designation', e.target.value)}
-                                                            onBlur={(e) => handleEmploymentBlur(empIndex, compIndex, 'designation', e.target.value)}
-                                                            className={getSmallInputClass(!!errors[empIndex]?.employments?.[compIndex]?.designation)}
-                                                            placeholder="Software Engineer"
-                                                        />
-                                                        {errors[empIndex]?.employments?.[compIndex]?.designation && (
-                                                            <p className="text-red-500 text-xs mt-1">{errors[empIndex].employments[compIndex].designation}</p>
-                                                        )}
-                                                    </div>
-                                                    <div className="md:col-span-2">
-                                                        <label className="block text-xs font-medium text-slate-600 mb-1">UAN Number (Optional)</label>
-                                                        <input
-                                                            type="text"
-                                                            value={employment.uanNumber}
-                                                            onChange={(e) => handleEmploymentChange(empIndex, compIndex, 'uanNumber', e.target.value)}
-                                                            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
-                                                            placeholder="123456789012"
-                                                        />
-                                                    </div>
+                                                <div>
+                                                    <label className="block text-sm font-medium text-slate-700 mb-2">Degree/Course *</label>
+                                                    <input
+                                                        type="text"
+                                                        value={employee.education?.degree || ''}
+                                                        onChange={(e) => {
+                                                            const updated = [...employees];
+                                                            updated[empIndex].education.degree = e.target.value;
+                                                            setEmployees(updated);
+                                                        }}
+                                                        className={getInputClass(!!errors[empIndex]?.education?.degree)}
+                                                        placeholder="e.g., B.Tech Computer Science"
+                                                    />
+                                                    {errors[empIndex]?.education?.degree && (
+                                                        <p className="text-red-500 text-xs mt-1">{errors[empIndex].education.degree}</p>
+                                                    )}
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-medium text-slate-700 mb-2">Year of Passing *</label>
+                                                    <input
+                                                        type="text"
+                                                        value={employee.education?.yearOfPassing || ''}
+                                                        onChange={(e) => {
+                                                            const updated = [...employees];
+                                                            updated[empIndex].education.yearOfPassing = e.target.value;
+                                                            setEmployees(updated);
+                                                        }}
+                                                        className={getInputClass(!!errors[empIndex]?.education?.yearOfPassing)}
+                                                        placeholder="e.g., 2022"
+                                                    />
+                                                    {errors[empIndex]?.education?.yearOfPassing && (
+                                                        <p className="text-red-500 text-xs mt-1">{errors[empIndex].education.yearOfPassing}</p>
+                                                    )}
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-medium text-slate-700 mb-2">University Registrar Email *</label>
+                                                    <input
+                                                        type="email"
+                                                        value={employee.education?.registrarEmail || ''}
+                                                        onChange={(e) => {
+                                                            const updated = [...employees];
+                                                            updated[empIndex].education.registrarEmail = e.target.value;
+                                                            setEmployees(updated);
+                                                        }}
+                                                        className={getInputClass(!!errors[empIndex]?.education?.registrarEmail)}
+                                                        placeholder="registrar@university.edu"
+                                                    />
+                                                    {errors[empIndex]?.education?.registrarEmail && (
+                                                        <p className="text-red-500 text-xs mt-1">{errors[empIndex].education.registrarEmail}</p>
+                                                    )}
+                                                    <p className="text-xs text-slate-500 mt-1">Email for automated verification request</p>
                                                 </div>
                                             </div>
-                                        ))}
+                                        </div>
                                     </div>
-                                </div>
+                                )}
+
+                                {/* Previous Employment History - Conditionally Shown */}
+                                {selectedChecks.employment && (
+                                    <div className="border-t border-slate-200 pt-6 mt-6">
+                                        <div className="flex justify-between items-center mb-4">
+                                            <h4 className="text-lg font-semibold text-slate-800">Previous Employment History</h4>
+                                            <button
+                                                type="button"
+                                                onClick={() => addPreviousEmployment(empIndex)}
+                                                className="text-blue-600 hover:text-blue-700 text-sm font-medium"
+                                            >
+                                                + Add Company
+                                            </button>
+                                        </div>
+
+                                        <div className="space-y-4">
+                                            {employee.previousEmployments.map((employment, compIndex) => (
+                                                <div key={compIndex} className="bg-slate-50 rounded-lg p-4">
+                                                    <div className="flex justify-between items-center mb-3">
+                                                        <span className="text-sm font-medium text-slate-700">Company #{compIndex + 1}</span>
+                                                        {employee.previousEmployments.length > 1 && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => removePreviousEmployment(empIndex, compIndex)}
+                                                                className="text-red-600 hover:text-red-700 text-xs"
+                                                            >
+                                                                Remove
+                                                            </button>
+                                                        )}
+                                                    </div>
+
+                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                        <div>
+                                                            <label className="block text-xs font-medium text-slate-600 mb-1">Company Name *</label>
+                                                            <input
+                                                                type="text"
+                                                                value={employment.companyName}
+                                                                onChange={(e) => handleEmploymentChange(empIndex, compIndex, 'companyName', e.target.value)}
+                                                                onBlur={(e) => handleEmploymentBlur(empIndex, compIndex, 'companyName', e.target.value)}
+                                                                className={getSmallInputClass(!!errors[empIndex]?.employments?.[compIndex]?.companyName)}
+                                                                placeholder="Previous Corp Ltd"
+                                                            />
+                                                            {errors[empIndex]?.employments?.[compIndex]?.companyName && (
+                                                                <p className="text-red-500 text-xs mt-1">{errors[empIndex].employments[compIndex].companyName}</p>
+                                                            )}
+                                                        </div>
+                                                        <div>
+                                                            <label className="block text-xs font-medium text-slate-600 mb-1">HR Email *</label>
+                                                            <input
+                                                                type="email"
+                                                                value={employment.hrEmail}
+                                                                onChange={(e) => handleEmploymentChange(empIndex, compIndex, 'hrEmail', e.target.value)}
+                                                                onBlur={(e) => handleEmploymentBlur(empIndex, compIndex, 'hrEmail', e.target.value)}
+                                                                className={getSmallInputClass(!!errors[empIndex]?.employments?.[compIndex]?.hrEmail)}
+                                                                placeholder="hr@previouscorp.com"
+                                                            />
+                                                            {errors[empIndex]?.employments?.[compIndex]?.hrEmail && (
+                                                                <p className="text-red-500 text-xs mt-1">{errors[empIndex].employments[compIndex].hrEmail}</p>
+                                                            )}
+                                                        </div>
+                                                        <div>
+                                                            <label className="block text-xs font-medium text-slate-600 mb-1">HR Phone</label>
+                                                            <input
+                                                                type="tel"
+                                                                value={employment.hrPhone}
+                                                                onChange={(e) => handleEmploymentChange(empIndex, compIndex, 'hrPhone', e.target.value)}
+                                                                onBlur={(e) => handleEmploymentBlur(empIndex, compIndex, 'hrPhone', e.target.value)}
+                                                                className={getSmallInputClass(false)}
+                                                                placeholder="+91-9876543210"
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <label className="block text-xs font-medium text-slate-600 mb-1">Employment Dates *</label>
+                                                            <input
+                                                                type="text"
+                                                                value={employment.employmentDates}
+                                                                onChange={(e) => handleEmploymentChange(empIndex, compIndex, 'employmentDates', e.target.value)}
+                                                                onBlur={(e) => handleEmploymentBlur(empIndex, compIndex, 'employmentDates', e.target.value)}
+                                                                className={getSmallInputClass(!!errors[empIndex]?.employments?.[compIndex]?.employmentDates)}
+                                                                placeholder="2020-01-15 to 2023-06-30"
+                                                            />
+                                                            {errors[empIndex]?.employments?.[compIndex]?.employmentDates && (
+                                                                <p className="text-red-500 text-xs mt-1">{errors[empIndex].employments[compIndex].employmentDates}</p>
+                                                            )}
+                                                        </div>
+                                                        <div>
+                                                            <label className="block text-xs font-medium text-slate-600 mb-1">Designation *</label>
+                                                            <input
+                                                                type="text"
+                                                                value={employment.designation}
+                                                                onChange={(e) => handleEmploymentChange(empIndex, compIndex, 'designation', e.target.value)}
+                                                                onBlur={(e) => handleEmploymentBlur(empIndex, compIndex, 'designation', e.target.value)}
+                                                                className={getSmallInputClass(!!errors[empIndex]?.employments?.[compIndex]?.designation)}
+                                                                placeholder="Software Engineer"
+                                                            />
+                                                            {errors[empIndex]?.employments?.[compIndex]?.designation && (
+                                                                <p className="text-red-500 text-xs mt-1">{errors[empIndex].employments[compIndex].designation}</p>
+                                                            )}
+                                                        </div>
+                                                        <div className="md:col-span-2">
+                                                            <label className="block text-xs font-medium text-slate-600 mb-1">UAN Number (Optional)</label>
+                                                            <input
+                                                                type="text"
+                                                                value={employment.uanNumber}
+                                                                onChange={(e) => handleEmploymentChange(empIndex, compIndex, 'uanNumber', e.target.value)}
+                                                                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
+                                                                placeholder="123456789012"
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         ))}
                     </div>
